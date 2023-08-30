@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { UserDTO } from 'src/common/user.dto';
-import ldap from 'ldapjs';
+const ldap = require('ldapjs');
 
 var ActiveDirectory = require('activedirectory');
 
@@ -76,29 +76,79 @@ export class ActiveDirectoryService {
         }
     }
 
-    // async createUser(): Promise<void> {
-    //     console.log("in");
-    //     const client = ldap.createClient({
-    //         url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
-    //     });
+    async createUser(body: UserDTO): Promise<string> {
+        const client = await ldap.createClient({
+            url: `ldap://orizvi.test`
+        });
+        
+        try {
+            await client.bind(`cn=shaleb,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, 'Turhmch123', (err) => {
+                if (err) {
+                    console.log("binding error " + err);
+                }
+                else {
+                    console.log("binded");
+                }
+            });
+            const entry = {
+                userPrincipalName: body.username,
+                sAMAccountName: body.username,
+                givenName: body.givenName,
+                sn: body.sn,
+                displayName: body.displayName,
+                mail: body.mail,
+                objectClass: 'user'
+
+            };
+            await client.add(`cn=${body.givenName},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
+                if (addErr) {
+                    console.log("not added " +addErr);
+                    return "fail";
+                }
+                else {
+                    console.log('User created successfully');
+                    return "success";
+                }
+            });
     
-    //     try {
-    //         await client.bind('cn=root', 'secret'); // Bind without a callback
-    //         console.log("create");
-    //         const entry = {
-    //             cn: 'foo',
-    //             sn: 'bar',
-    //             email: 'foo@bar.com',
-    //             objectclass: 'fooPerson'
-    //         };
-    //         await client.add('cn=foo, o=example', entry); // Add the entry without a callback
-    //         console.log("add");
+        } catch (error) {
+            console.log('An error occurred:'+ error);
+            return "error";
+        } finally {
+            await client.unbind();
+        }
+    }
+
+    async deleteUser(name: string): Promise<string> {
+        const client = await ldap.createClient({
+            url: `ldap://orizvi.test`
+        });
+        
+        try {
+            await client.bind(`cn=shaleb,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, 'Turhmch123', (err) => {
+                if (err) {
+                    console.log("binding error " + err);
+                }
+                else {
+                    console.log("binded");
+                }
+            });
+            await client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
+                if (addErr) {
+                    console.log("not deleted " +addErr);
+                    return "fail";
+                }
+                else {
+                    console.log('User deleted successfully');
+                    return "success";
+                }
+            });
     
-    //         console.log('User created successfully');
-    //     } catch (error) {
-    //         console.error('An error occurred:', error);
-    //     } finally {
-    //         client.unbind(); // Unbind the client connection
-    //     }
-    // }
+        } catch (error) {
+            console.log('An error occurred:'+ error);
+            return "error";
+        } finally {
+            await client.unbind();
+        }
+    }
 }

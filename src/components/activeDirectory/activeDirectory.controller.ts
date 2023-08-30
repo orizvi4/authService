@@ -14,6 +14,13 @@ export class ActiveDirectoryController {
   @Get("/authenticate/group")
   async memberOF(@Query("username") username: string, @Query("group") group: string) {
     return await this.activeDirectoryService.memberOf(username, group);
-    //return await this.activeDirectoryService.createUser();
+  }
+  @Post("/create/user")
+  async addUser(@Body() body: UserDTO) {
+    return await this.activeDirectoryService.createUser(body);
+  }
+  @Get("/delete/user")
+  async deleteUser(@Query("username") username: string) {
+    return await this.activeDirectoryService.deleteUser(username);
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { rejects } from 'assert';
 import { UserDTO } from 'src/common/user.dto';
 const ldap = require('ldapjs');
 
@@ -80,41 +81,48 @@ export class ActiveDirectoryService {
         const client = await ldap.createClient({
             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
         });
+        await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+            if (err) {
+                console.log("binding error " + err);
+            }
+            else {
+                console.log("binded");
+            }
+        });
+        const entry = {
+            userPrincipalName: body.username,
+            sAMAccountName: body.username,
+            givenName: body.givenName,
+            sn: body.sn,
+            displayName: body.displayName,
+            mail: body.mail,
+            objectClass: 'user'
 
+        };
         try {
-            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-                if (err) {
-                    console.log("binding error " + err);
-                }
-                else {
-                    console.log("binded");
-                }
-            });
-            const entry = {
-                userPrincipalName: body.username,
-                sAMAccountName: body.username,
-                givenName: body.givenName,
-                sn: body.sn,
-                displayName: body.displayName,
-                mail: body.mail,
-                objectClass: 'user'
-
-            };
-            await client.add(`cn=${body.givenName},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
-                if (addErr) {
-                    console.log("not added " + addErr);
-                    return "fail";
-                }
-                else {
+            const res = await new Promise((resolve, reject) => {
+                client.add(`cn=${body.givenName},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
+                    if (addErr) {
+                        console.log("not added " + addErr);
+                        return reject(addErr);
+                    }
                     console.log('User created successfully');
-                    return "success";
-                }
-            });
+                    resolve("success");
+                });
 
-        } catch (error) {
+            });
+            if (res) {
+                return "success";
+            }
+            else {
+                return "fail"
+            }
+        }
+        catch (error) {
             console.log('An error occurred:' + error);
             return "error";
-        } finally {
+        }
+        finally {
             await client.unbind();
         }
     }
@@ -123,31 +131,37 @@ export class ActiveDirectoryService {
         const client = await ldap.createClient({
             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
         });
-
+        await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+            if (err) {
+                console.log("binding error " + err);
+            }
+            else {
+                console.log("binded");
+            }
+        });
         try {
-            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-                if (err) {
-                    console.log("binding error " + err);
-                }
-                else {
-                    console.log("binded");
-                }
-            });
-            await client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
-                if (addErr) {
-                    console.log("not deleted " + addErr);
-                    return "fail";
-                }
-                else {
+            const res = await new Promise((resolve, reject) => {
+                client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
+                    if (addErr) {
+                        console.log("not deleted " + addErr);
+                        return reject("fail");
+                    }
                     console.log('User deleted successfully');
-                    return "success";
-                }
+                    resolve("success");
+                });
             });
-
-        } catch (error) {
+            if (res) {
+                return "success";
+            }
+            else {
+                return "fail"
+            }
+        }
+        catch (error) {
             console.log('An error occurred:' + error);
             return "error";
-        } finally {
+        }
+        finally {
             await client.unbind();
         }
     }
@@ -156,38 +170,44 @@ export class ActiveDirectoryService {
         const client = await ldap.createClient({
             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
         });
+        await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+            if (err) {
+                console.log("binding error " + err);
+            }
+            else {
+                console.log("binded");
+            }
+        });
+        const change = {
+            operation: 'add',
+            modification: {
+                member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
+            }
 
+        };
         try {
-            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-                if (err) {
-                    console.log("binding error " + err);
-                }
-                else {
-                    console.log("binded");
-                }
-            });
-            const change = {
-                operation: 'add',
-                modification: {
-                    member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
-                }
-
-            };
-            await client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-                if (addErr) {
-                    console.log("not changed " + addErr);
-                    return "fail";
-                }
-                else {
+            const res = await new Promise((resolve, reject) => {
+                client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                    if (addErr) {
+                        console.log("not changed " + addErr);
+                        return reject("fail");
+                    }
                     console.log('User changed successfully');
-                    return "success";
-                }
+                    resolve("success");
+                });
             });
-
-        } catch (error) {
+            if (res) {
+                return "success";
+            }
+            else {
+                return "fail"
+            }
+        }
+        catch (error) {
             console.log('An error occurred:' + error);
             return "error";
-        } finally {
+        }
+        finally {
             await client.unbind();
         }
     }
@@ -196,38 +216,44 @@ export class ActiveDirectoryService {
         const client = await ldap.createClient({
             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
         });
+        await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+            if (err) {
+                console.log("binding error " + err);
+            }
+            else {
+                console.log("binded");
+            }
+        });
+        const change = {
+            operation: 'delete',
+            modification: {
+                member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
+            }
 
+        };
         try {
-            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-                if (err) {
-                    console.log("binding error " + err);
-                }
-                else {
-                    console.log("binded");
-                }
-            });
-            const change = {
-                operation: 'delete',
-                modification: {
-                    member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
-                }
-
-            };
-            await client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-                if (addErr) {
-                    console.log("not changed " + addErr);
-                    return "fail";
-                }
-                else {
+            const res = await new Promise((resolve, reject) => {
+                client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                    if (addErr) {
+                        console.log("not changed " + addErr);
+                        return reject("fail");
+                    }
                     console.log('User changed successfully');
-                    return "success";
-                }
+                    resolve("success");
+                });
             });
-
-        } catch (error) {
+            if (res) {
+                return "success";
+            }
+            else {
+                return "fail"
+            }
+        }
+        catch (error) {
             console.log('An error occurred:' + error);
             return "error";
-        } finally {
+        }
+        finally {
             await client.unbind();
         }
     }

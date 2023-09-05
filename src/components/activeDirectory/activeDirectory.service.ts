@@ -4,7 +4,7 @@ const ldap = require('ldapjs');
 
 var ActiveDirectory = require('activedirectory');
 
-const ADMIN_USER: string = "shaleb@orizvi.test";
+const ADMIN_USER: string = "shaleb";
 const ADMIN_PASWORD: string = "Turhmch123";
 const DOMAIN_NAME: string = "orizvi";
 const DOMAIN_END: string = "test";
@@ -14,7 +14,7 @@ export class ActiveDirectoryService {
     config = {
         url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`,
         baseDN: `dc=${DOMAIN_NAME},dc=${DOMAIN_END}`,
-        username: ADMIN_USER,
+        username: `${ADMIN_USER}@${DOMAIN_NAME}.${DOMAIN_END}`,
         password: ADMIN_PASWORD
     };
     activeDirectory = new ActiveDirectory(this.config);
@@ -78,11 +78,11 @@ export class ActiveDirectoryService {
 
     async createUser(body: UserDTO): Promise<string> {
         const client = await ldap.createClient({
-            url: `ldap://orizvi.test`
+            url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
         });
-        
+
         try {
-            await client.bind(`cn=shaleb,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, 'Turhmch123', (err) => {
+            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
                 if (err) {
                     console.log("binding error " + err);
                 }
@@ -102,7 +102,7 @@ export class ActiveDirectoryService {
             };
             await client.add(`cn=${body.givenName},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
                 if (addErr) {
-                    console.log("not added " +addErr);
+                    console.log("not added " + addErr);
                     return "fail";
                 }
                 else {
@@ -110,9 +110,9 @@ export class ActiveDirectoryService {
                     return "success";
                 }
             });
-    
+
         } catch (error) {
-            console.log('An error occurred:'+ error);
+            console.log('An error occurred:' + error);
             return "error";
         } finally {
             await client.unbind();
@@ -121,11 +121,11 @@ export class ActiveDirectoryService {
 
     async deleteUser(name: string): Promise<string> {
         const client = await ldap.createClient({
-            url: `ldap://orizvi.test`
+            url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
         });
-        
+
         try {
-            await client.bind(`cn=shaleb,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, 'Turhmch123', (err) => {
+            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
                 if (err) {
                     console.log("binding error " + err);
                 }
@@ -135,7 +135,7 @@ export class ActiveDirectoryService {
             });
             await client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
                 if (addErr) {
-                    console.log("not deleted " +addErr);
+                    console.log("not deleted " + addErr);
                     return "fail";
                 }
                 else {
@@ -143,9 +143,89 @@ export class ActiveDirectoryService {
                     return "success";
                 }
             });
-    
+
         } catch (error) {
-            console.log('An error occurred:'+ error);
+            console.log('An error occurred:' + error);
+            return "error";
+        } finally {
+            await client.unbind();
+        }
+    }
+
+    async addGroup(name: string, group: string): Promise<string> {
+        const client = await ldap.createClient({
+            url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
+        });
+
+        try {
+            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+                if (err) {
+                    console.log("binding error " + err);
+                }
+                else {
+                    console.log("binded");
+                }
+            });
+            const change = {
+                operation: 'add',
+                modification: {
+                    member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
+                }
+
+            };
+            await client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                if (addErr) {
+                    console.log("not changed " + addErr);
+                    return "fail";
+                }
+                else {
+                    console.log('User changed successfully');
+                    return "success";
+                }
+            });
+
+        } catch (error) {
+            console.log('An error occurred:' + error);
+            return "error";
+        } finally {
+            await client.unbind();
+        }
+    }
+
+    async deleteGroup(name: string, group: string): Promise<string> {
+        const client = await ldap.createClient({
+            url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
+        });
+
+        try {
+            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+                if (err) {
+                    console.log("binding error " + err);
+                }
+                else {
+                    console.log("binded");
+                }
+            });
+            const change = {
+                operation: 'delete',
+                modification: {
+                    member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
+                }
+
+            };
+            await client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                if (addErr) {
+                    console.log("not changed " + addErr);
+                    return "fail";
+                }
+                else {
+                    console.log('User changed successfully');
+                    return "success";
+                }
+            });
+
+        } catch (error) {
+            console.log('An error occurred:' + error);
             return "error";
         } finally {
             await client.unbind();

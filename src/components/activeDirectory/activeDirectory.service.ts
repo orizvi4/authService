@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { rejects } from 'assert';
 import { UserDTO } from 'src/common/user.dto';
-const ldap = require('ldapjs');
 
+const ldap = require('ldapjs');
 var ActiveDirectory = require('activedirectory');
 
 const ADMIN_USER: string = "shaleb";
@@ -19,6 +18,20 @@ export class ActiveDirectoryService {
         password: ADMIN_PASWORD
     };
     activeDirectory = new ActiveDirectory(this.config);
+
+    async getUsers(): Promise<string> {
+        return await new Promise<string>((resolve, reject) => {
+            this.activeDirectory.findUsers((err, users) => {
+                if (err) {
+                    console.log(err);
+                    reject("error");
+                }
+                else {
+                    resolve(JSON.stringify(users.slice(3)));
+                }
+            });
+        });
+    }
 
     async authenticate(body: UserDTO): Promise<string> {
         let username: string = `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`;
@@ -90,18 +103,16 @@ export class ActiveDirectoryService {
             }
         });
         const entry = {
-            userPrincipalName: body.username,
+            userPrincipalName: `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
             sAMAccountName: body.username,
-            givenName: body.givenName,
+            givenName: body.username,
             sn: body.sn,
-            displayName: body.displayName,
-            mail: body.mail,
             objectClass: 'user'
 
         };
         try {
             const res = await new Promise((resolve, reject) => {
-                client.add(`cn=${body.givenName},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
+                client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
                     if (addErr) {
                         console.log("not added " + addErr);
                         return reject(addErr);

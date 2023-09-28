@@ -28,10 +28,10 @@ export class ActiveDirectoryController {
   }
   @Get("/groups/add")
   async addGroup(@Query("username") username: string, @Query("group") group: string) {
-    return await this.activeDirectoryService.addGroup(username, group);
+    return await this.activeDirectoryService.addToGroup(username, group);
   }
   @Get("/groups/delete")
   async deleteGroup(@Query("username") username: string, @Query("group") group: string) {
-    return await this.activeDirectoryService.deleteGroup(username, group);
+    return await this.activeDirectoryService.deleteFromGroup(username, group);
   }
 }

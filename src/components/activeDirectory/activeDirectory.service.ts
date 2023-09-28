@@ -123,7 +123,14 @@ export class ActiveDirectoryService {
 
             });
             if (res) {
-                return "success";
+                const now: string[] = ((new Date()).toLocaleDateString()).split('/');
+                return JSON.stringify({
+                    userPrincipalName: `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
+                    givenName: body.username,
+                    sn: body.sn,
+                    isEdit: false,
+                    whenCreated: `${now[2]}${now[1]}${now[0]}`
+                });;
             }
             else {
                 return "fail"
@@ -177,7 +184,7 @@ export class ActiveDirectoryService {
         }
     }
 
-    async addGroup(name: string, group: string): Promise<string> {
+    async addToGroup(name: string, group: string): Promise<string> {
         const client = await ldap.createClient({
             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
         });
@@ -223,7 +230,7 @@ export class ActiveDirectoryService {
         }
     }
 
-    async deleteGroup(name: string, group: string): Promise<string> {
+    async deleteFromGroup(name: string, group: string): Promise<string> {
         const client = await ldap.createClient({
             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
         });

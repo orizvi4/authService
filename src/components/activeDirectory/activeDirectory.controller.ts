@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Put, Query } from '@nestjs/common';
 import { ActiveDirectoryService } from './activeDirectory.service';
 import { UserDTO } from 'src/common/user.dto';
 
@@ -25,6 +25,10 @@ export class ActiveDirectoryController {
   @Delete("/users/delete")
   async deleteUser(@Query("username") username: string) {
     return await this.activeDirectoryService.deleteUser(username);
+  }
+  @Put("/users/modify")
+  async modifyUser(@Body() body: UserDTO[]): Promise<string> {
+    return (await this.activeDirectoryService.modifyUser(body))
   }
   @Get("/groups/add")
   async addGroup(@Query("username") username: string, @Query("group") group: string) {

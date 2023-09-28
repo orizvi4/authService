@@ -90,6 +90,13 @@ export class ActiveDirectoryService {
         }
     }
 
+    async modifyUser(body: UserDTO[]) {
+        const oldUser: UserDTO = body[0];
+        const newUser: UserDTO = body[1];
+        await this.deleteUser(oldUser.username);
+        return await this.createUser(newUser);
+    }
+
     async createUser(body: UserDTO): Promise<string> {
         const client = await ldap.createClient({
             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
@@ -107,6 +114,7 @@ export class ActiveDirectoryService {
             sAMAccountName: body.username,
             givenName: body.username,
             sn: body.sn,
+            displayName: `${body.username} ${body.sn}`,
             objectClass: 'user'
 
         };
@@ -120,9 +128,25 @@ export class ActiveDirectoryService {
                     console.log('User created successfully');
                     resolve("success");
                 });
-
             });
             if (res) {
+                // await new Promise((resolve, reject) => {
+                //     const change = {
+                //         operation: 'replace',
+                //         modification: {
+                //             userAccountControl: 512
+                //         }
+                //     }
+                //     client.modify(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                //         if (addErr) {
+                //             console.log("not changed " + addErr);
+                //             return reject("fail");
+                //         }
+                //         console.log('User changed successfully');
+                //         resolve("success");
+                //     });
+                // });
+
                 const now: string[] = ((new Date()).toLocaleDateString()).split('/');
                 return JSON.stringify({
                     userPrincipalName: `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`,

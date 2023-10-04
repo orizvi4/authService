@@ -30,12 +30,8 @@ export class ActiveDirectoryController {
   async modifyUser(@Body() body: UserDTO[]): Promise<string> {
     return (await this.activeDirectoryService.modifyUser(body))
   }
-  @Get("/groups/add")
-  async addGroup(@Query("username") username: string, @Query("group") group: string) {
-    return await this.activeDirectoryService.addToGroup(username, group);
-  }
-  @Get("/groups/delete")
-  async deleteGroup(@Query("username") username: string, @Query("group") group: string) {
-    return await this.activeDirectoryService.deleteFromGroup(username, group);
+  @Get('/groups/user')
+  async getUserGroup(@Query("username") username: string): Promise<string> {
+    return await this.activeDirectoryService.getUserGroup(username);
   }
 }

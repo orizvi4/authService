@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { promises } from 'dns';
+import { findIndex } from 'rxjs';
 import { UserDTO } from 'src/common/user.dto';
 
 const ldap = require('ldapjs');
@@ -110,8 +111,55 @@ export class ActiveDirectoryService {
     async modifyUser(body: UserDTO[]) {
         const oldUser: UserDTO = body[0];
         const newUser: UserDTO = body[1];
-        await this.deleteUser(oldUser.username);
-        return await this.createUser(newUser);
+        try {
+            await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+                if (err) {
+                    console.log("binding error " + err);
+                }
+                else {
+                    console.log("binded");
+                }
+            });
+            const currentDN = `cn=${oldUser.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`;
+            const newDN = `cn=${newUser.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`;
+            const change = {
+                operation: 'replace',
+                modification: {
+                    userPrincipalName: `${newUser.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
+                    sAMAccountName: newUser.username,
+                    givenName: newUser.username,
+                    sn: newUser.sn,
+                    displayName: `${newUser.username} ${newUser.sn}`,
+                }
+            };
+            this.client.modify(currentDN, change, (err) => {
+                if (err) {
+                    console.log(err);
+                    return "error";
+                }
+            });
+
+            this.client.modifyDN(currentDN, newDN, (err) => {
+                if (err) {
+                    console.log(err);
+                    return "error";
+                }
+            })
+            await this.updateGroupOfUser(newUser.username, newUser.group);
+            return JSON.stringify({
+                userPrincipalName: `${newUser.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
+                givenName: newUser.username,
+                sn: newUser.sn,
+                isEdit: false,
+                group: newUser.group,
+            });
+        }
+        catch (err) {
+            console.log(err);
+        }
+        finally {
+            await this.client.unbind();
+        }
     }
 
     async createUser(body: UserDTO): Promise<string> {
@@ -222,7 +270,7 @@ export class ActiveDirectoryService {
             await this.client.unbind();
         }
     }
-    
+
     async addToGroup(name: string, group: string): Promise<string> {
         try {
             const change = {
@@ -254,109 +302,66 @@ export class ActiveDirectoryService {
         }
     }
 
+    async updateGroupOfUser(name: string, newGroup: string) {
+        for (const group of this.groups) {
+            if (newGroup != 'users') {
+                if (group != newGroup && await this.memberOf(name, group)) {
+                    await this.deleteFromGroup(name, group);
+                }
+                else {
+                    await this.addToGroup(name, group);
+                }
+            }
+            else {
+                await this.deleteFromGroup(name, group);
+            }
+        }
+    }
 
+    async deleteFromGroup(name: string, group: string): Promise<string> {
+        let client;
+        try {
+            client = await ldap.createClient({
+                url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
+            });
+            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+                if (err) {
+                    console.log("binding error " + err);
+                }
+                else {
+                    console.log("binded");
+                }
+            });
+            const change = {
+                operation: 'delete',
+                modification: {
+                    member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
+                }
 
-    // async updateGroupOfUser(name: string, newGroup: string) {
-    //     for (const group of this.groups) {
-    //         if (group != newGroup) {
-    //             await this.deleteFromGroup(name, group);
-    //         }
-    //         else {
-    //             await this.addToGroup(name, group);
-    //         }
-    //     }
-    // }
+            };
 
-    // async addToGroup(name: string, group: string): Promise<string> {
-    //     let client;
-    //     try {
-    //         client = await ldap.createClient({
-    //             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
-    //         });
-    //         await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-    //             if (err) {
-    //                 console.log("binding error " + err);
-    //             }
-    //             else {
-    //                 console.log("binded");
-    //             }
-    //         });
-    //         const change = {
-    //             operation: 'add',
-    //             modification: {
-    //                 member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
-    //             }
-    //         };
-
-    //         const res = await new Promise((resolve, reject) => {
-    //             client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-    //                 if (addErr) {
-    //                     return reject(addErr);
-    //                 }
-    //                 console.log('group added successfully');
-    //                 resolve("success");
-    //             });
-    //         });
-    //         if (res) {
-    //             return "success";
-    //         }
-    //         else {
-    //             return "error";
-    //         }
-    //     }
-    //     catch (error) {
-    //         console.log('not added:' + error);
-    //         return "error";
-    //     }
-    //     finally {
-    //         await client.unbind();
-    //     }
-    // }
-
-    // async deleteFromGroup(name: string, group: string): Promise<string> {
-    //     let client;
-    //     try {
-    //         client = await ldap.createClient({
-    //             url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
-    //         });
-    //         await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-    //             if (err) {
-    //                 console.log("binding error " + err);
-    //             }
-    //             else {
-    //                 console.log("binded");
-    //             }
-    //         });
-    //         const change = {
-    //             operation: 'delete',
-    //             modification: {
-    //                 member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
-    //             }
-
-    //         };
-
-    //         const res = await new Promise((resolve, reject) => {
-    //             client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-    //                 if (addErr) {
-    //                     return reject(addErr);
-    //                 }
-    //                 console.log('group deleted successfully');
-    //                 resolve("success");
-    //             });
-    //         });
-    //         if (res) {
-    //             return "success";
-    //         }
-    //         else {
-    //             return "error";
-    //         }
-    //     }
-    //     catch (error) {
-    //         console.log('not deleted:' + error);
-    //         return "error";
-    //     }
-    //     finally {
-    //         await client.unbind();
-    //     }
-    // }
+            const res = await new Promise((resolve, reject) => {
+                client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                    if (addErr) {
+                        return reject(addErr);
+                    }
+                    console.log('group deleted successfully');
+                    resolve("success");
+                });
+            });
+            if (res) {
+                return "success";
+            }
+            else {
+                return "error";
+            }
+        }
+        catch (error) {
+            console.log('not deleted:' + error);
+            return "error";
+        }
+        finally {
+            await client.unbind();
+        }
+    }
 }

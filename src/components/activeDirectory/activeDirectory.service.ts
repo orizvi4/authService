@@ -162,9 +162,6 @@ export class ActiveDirectoryService {
         catch (err) {
             console.log(err);
         }
-        // finally {
-        //     await this.client.unbind();
-        // }
     }
 
     async createUser(body: UserDTO): Promise<string> {
@@ -197,7 +194,7 @@ export class ActiveDirectoryService {
                 //             userAccountControl: 512
                 //         }
                 //     }
-                //     client.modify(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                //     this.client.modify(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
                 //         if (addErr) {
                 //             console.log("not changed " + addErr);
                 //             return reject("fail");
@@ -227,9 +224,6 @@ export class ActiveDirectoryService {
             console.log('An error occurred:' + error);
             return "error";
         }
-        // finally {
-        //     await this.client.unbind();
-        // }
     }
 
     async deleteUser(name: string): Promise<string> {
@@ -256,9 +250,6 @@ export class ActiveDirectoryService {
             console.log('An error occurred:' + error);
             return "error";
         }
-        // finally {
-        //     await this.client.unbind();
-        // }
     }
 
     async addToGroup(name: string, group: string): Promise<string> {

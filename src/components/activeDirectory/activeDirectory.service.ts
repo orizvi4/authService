@@ -22,8 +22,7 @@ export class ActiveDirectoryService {
     activeDirectory = new ActiveDirectory(this.config);
     groups: string[] = ['commanders', 'managers'];
     client = ldap.createClient({
-        url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`,
-        reconnect: true
+        url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
     });
 
     async getUsers(): Promise<string> {
@@ -108,18 +107,22 @@ export class ActiveDirectoryService {
         }
     }
 
+    async clientBind() {
+        await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+            if (err) {
+                console.log("binding error " + err);
+            }
+            else {
+                console.log("binded");
+            }
+        });
+    }
+
     async modifyUser(body: UserDTO[]) {
         const oldUser: UserDTO = body[0];
         const newUser: UserDTO = body[1];
         try {
-            await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-                if (err) {
-                    console.log("binding error " + err);
-                }
-                else {
-                    console.log("binded");
-                }
-            });
+            await this.clientBind();
             const currentDN = `cn=${oldUser.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`;
             const newDN = `cn=${newUser.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`;
             const change = {
@@ -138,13 +141,15 @@ export class ActiveDirectoryService {
                     return "error";
                 }
             });
+            if (newUser.username != oldUser.username) {
+                this.client.modifyDN(currentDN, newDN, (err) => {
+                    if (err) {
+                        console.log(err);
+                        return "error";
+                    }
+                });
+            }
 
-            this.client.modifyDN(currentDN, newDN, (err) => {
-                if (err) {
-                    console.log(err);
-                    return "error";
-                }
-            })
             await this.updateGroupOfUser(newUser.username, newUser.group);
             return JSON.stringify({
                 userPrincipalName: `${newUser.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
@@ -157,21 +162,14 @@ export class ActiveDirectoryService {
         catch (err) {
             console.log(err);
         }
-        finally {
-            await this.client.unbind();
-        }
+        // finally {
+        //     await this.client.unbind();
+        // }
     }
 
     async createUser(body: UserDTO): Promise<string> {
         try {
-            await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-                if (err) {
-                    console.log("binding error " + err);
-                }
-                else {
-                    console.log("binded");
-                }
-            });
+            await this.clientBind();
             const entry = {
                 userPrincipalName: `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
                 sAMAccountName: body.username,
@@ -181,7 +179,6 @@ export class ActiveDirectoryService {
                 objectClass: 'user'
 
             };
-
             const res = await new Promise((resolve, reject) => {
                 this.client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
                     if (addErr) {
@@ -230,21 +227,14 @@ export class ActiveDirectoryService {
             console.log('An error occurred:' + error);
             return "error";
         }
-        finally {
-            await this.client.unbind();
-        }
+        // finally {
+        //     await this.client.unbind();
+        // }
     }
 
     async deleteUser(name: string): Promise<string> {
         try {
-            await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-                if (err) {
-                    console.log("binding error " + err);
-                }
-                else {
-                    console.log("binded");
-                }
-            });
+            await this.clientBind();
             const res = await new Promise((resolve, reject) => {
                 this.client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
                     if (addErr) {
@@ -266,9 +256,9 @@ export class ActiveDirectoryService {
             console.log('An error occurred:' + error);
             return "error";
         }
-        finally {
-            await this.client.unbind();
-        }
+        // finally {
+        //     await this.client.unbind();
+        // }
     }
 
     async addToGroup(name: string, group: string): Promise<string> {
@@ -308,12 +298,14 @@ export class ActiveDirectoryService {
                 if (group != newGroup && await this.memberOf(name, group)) {
                     await this.deleteFromGroup(name, group);
                 }
-                else {
+                else if (group == newGroup && !(await this.memberOf(name, group))) {
                     await this.addToGroup(name, group);
                 }
             }
             else {
-                await this.deleteFromGroup(name, group);
+                if (await this.memberOf(name, group)) {
+                    await this.deleteFromGroup(name, group);
+                }
             }
         }
     }

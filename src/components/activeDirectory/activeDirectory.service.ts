@@ -11,18 +11,11 @@ const ADMIN_PASWORD: string = "Turhmch123";
 const DOMAIN_NAME: string = "orizvi";
 const DOMAIN_END: string = "test";
 
-let client = ldap.createClient({
-    url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
-});
-client.on('error', (err) => {
-    console.log('recon');
-    client = ldap.createClient({
-        url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
-    });
-});
-
 @Injectable()
 export class ActiveDirectoryService {
+    constructor() {
+        this.createLDAPClient();
+    }
     config = {
         url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`,
         baseDN: `dc=${DOMAIN_NAME},dc=${DOMAIN_END}`,
@@ -31,6 +24,18 @@ export class ActiveDirectoryService {
     };
     activeDirectory = new ActiveDirectory(this.config);
     groups: string[] = ['commanders', 'managers'];
+    client;
+
+
+    createLDAPClient() {
+        this.client = ldap.createClient({
+            url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
+        });
+        this.client.on('error', (err) => {
+            console.log(err);
+            this.createLDAPClient();
+        });
+    }
 
     async getUsers(): Promise<string> {
         return await new Promise<string>((resolve, reject) => {
@@ -118,7 +123,7 @@ export class ActiveDirectoryService {
     }
 
     async clientBind() {
-        await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+        await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
             if (err) {
                 console.log("binding error " + err);
             }
@@ -145,14 +150,14 @@ export class ActiveDirectoryService {
                     displayName: `${newUser.username} ${newUser.sn}`,
                 }
             };
-            client.modify(currentDN, change, (err) => {
+            this.client.modify(currentDN, change, (err) => {
                 if (err) {
                     console.log(err);
                     return "error";
                 }
             });
             if (newUser.username != oldUser.username) {
-                client.modifyDN(currentDN, newDN, (err) => {
+                this.client.modifyDN(currentDN, newDN, (err) => {
                     if (err) {
                         console.log(err);
                         return "error";
@@ -187,7 +192,7 @@ export class ActiveDirectoryService {
 
             };
             const res = await new Promise((resolve, reject) => {
-                client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
+                this.client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
                     if (addErr) {
                         console.log("not created " + addErr);
                         return reject(addErr);
@@ -240,7 +245,7 @@ export class ActiveDirectoryService {
         try {
             await this.clientBind();
             const res = await new Promise((resolve, reject) => {
-                client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
+                this.client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
                     if (addErr) {
                         console.log("not deleted " + addErr);
                         return reject("fail");
@@ -272,7 +277,7 @@ export class ActiveDirectoryService {
             };
 
             const res = await new Promise((resolve, reject) => {
-                client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
                     if (addErr) {
                         return reject(addErr);
                     }
@@ -312,19 +317,8 @@ export class ActiveDirectoryService {
     }
 
     async deleteFromGroup(name: string, group: string): Promise<string> {
-        let client;
         try {
-            client = await ldap.createClient({
-                url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
-            });
-            await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-                if (err) {
-                    console.log("binding error " + err);
-                }
-                else {
-                    console.log("binded");
-                }
-            });
+            this.clientBind();
             const change = {
                 operation: 'delete',
                 modification: {
@@ -332,9 +326,8 @@ export class ActiveDirectoryService {
                 }
 
             };
-
             const res = await new Promise((resolve, reject) => {
-                client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
                     if (addErr) {
                         return reject(addErr);
                     }
@@ -352,9 +345,6 @@ export class ActiveDirectoryService {
         catch (error) {
             console.log('not deleted:' + error);
             return "error";
-        }
-        finally {
-            await client.unbind();
         }
     }
 }

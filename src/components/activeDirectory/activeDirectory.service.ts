@@ -11,6 +11,17 @@ const ADMIN_PASWORD: string = "Turhmch123";
 const DOMAIN_NAME: string = "orizvi";
 const DOMAIN_END: string = "test";
 
+let client = ldap.createClient({
+    url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`,
+    reconnect: true
+});
+client.on('error', (err) => {
+    client = ldap.createClient({
+        url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`,
+        reconnect: true
+    });
+});
+
 @Injectable()
 export class ActiveDirectoryService {
     config = {
@@ -21,9 +32,6 @@ export class ActiveDirectoryService {
     };
     activeDirectory = new ActiveDirectory(this.config);
     groups: string[] = ['commanders', 'managers'];
-    client = ldap.createClient({
-        url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
-    });
 
     async getUsers(): Promise<string> {
         return await new Promise<string>((resolve, reject) => {
@@ -39,32 +47,35 @@ export class ActiveDirectoryService {
         });
     }
 
-    async authenticate(body: UserDTO): Promise<string> {
+    async authenticate(body: UserDTO): Promise<UserDTO> {
         let username: string = `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`;
         let password: string = body.password;
 
         try {
-            const userExist = await new Promise((resolve, reject) => {
+            await new Promise((resolve, reject) => {
                 this.activeDirectory.authenticate(username, password, (err, auth) => {
                     if (err) {
                         console.log('ERROR: ' + JSON.stringify(err));
-                        return reject(err);
+                        return reject('fail');
                     }
                     resolve(auth);
                 });
             });
-
-            if (userExist) {
-                console.log('Authenticated!');
-                return "success";
-            } else {
-                console.log('Authentication failed!');
-                return "error";
-            }
+            console.log('Authenticated!');
+            let user: UserDTO = await new Promise((resolve, reject) => {
+                this.activeDirectory.findUser(username, (err, user) => {
+                    if (err) {
+                        console.log('ERROR: ' + JSON.stringify(err));
+                        return reject('fail');
+                    }
+                    resolve(user);
+                });
+            });
+            return {...user, group: await this.getUserGroup(body.username)}
         }
-        catch (error) {
-            console.error('An error occurred:', error);
-            return "error";
+        catch (err) {
+            console.error('Authentication failed');
+            return err;
         }
     }
     async getUserGroup(username: string): Promise<string> {
@@ -108,7 +119,7 @@ export class ActiveDirectoryService {
     }
 
     async clientBind() {
-        await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+        await client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
             if (err) {
                 console.log("binding error " + err);
             }
@@ -135,14 +146,14 @@ export class ActiveDirectoryService {
                     displayName: `${newUser.username} ${newUser.sn}`,
                 }
             };
-            this.client.modify(currentDN, change, (err) => {
+            client.modify(currentDN, change, (err) => {
                 if (err) {
                     console.log(err);
                     return "error";
                 }
             });
             if (newUser.username != oldUser.username) {
-                this.client.modifyDN(currentDN, newDN, (err) => {
+                client.modifyDN(currentDN, newDN, (err) => {
                     if (err) {
                         console.log(err);
                         return "error";
@@ -177,7 +188,7 @@ export class ActiveDirectoryService {
 
             };
             const res = await new Promise((resolve, reject) => {
-                this.client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
+                client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
                     if (addErr) {
                         console.log("not created " + addErr);
                         return reject(addErr);
@@ -194,7 +205,7 @@ export class ActiveDirectoryService {
                 //             userAccountControl: 512
                 //         }
                 //     }
-                //     this.client.modify(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                //     client.modify(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
                 //         if (addErr) {
                 //             console.log("not changed " + addErr);
                 //             return reject("fail");
@@ -230,7 +241,7 @@ export class ActiveDirectoryService {
         try {
             await this.clientBind();
             const res = await new Promise((resolve, reject) => {
-                this.client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
+                client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
                     if (addErr) {
                         console.log("not deleted " + addErr);
                         return reject("fail");
@@ -262,7 +273,7 @@ export class ActiveDirectoryService {
             };
 
             const res = await new Promise((resolve, reject) => {
-                this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
                     if (addErr) {
                         return reject(addErr);
                     }

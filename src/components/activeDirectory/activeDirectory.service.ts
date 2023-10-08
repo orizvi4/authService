@@ -12,13 +12,12 @@ const DOMAIN_NAME: string = "orizvi";
 const DOMAIN_END: string = "test";
 
 let client = ldap.createClient({
-    url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`,
-    reconnect: true
+    url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
 });
 client.on('error', (err) => {
+    console.log('recon');
     client = ldap.createClient({
-        url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`,
-        reconnect: true
+        url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
     });
 });
 

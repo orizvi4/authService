@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { promises } from 'dns';
-import { findIndex } from 'rxjs';
+import { resolve } from 'path';
 import { UserDTO } from 'src/common/user.dto';
 
 const ldap = require('ldapjs');
 var ActiveDirectory = require('activedirectory');
 
-const ADMIN_USER: string = "shaleb";
+const ADMIN_USER: string = "ori";
 const ADMIN_PASWORD: string = "Turhmch123";
 const DOMAIN_NAME: string = "orizvi";
 const DOMAIN_END: string = "test";
@@ -27,9 +26,12 @@ export class ActiveDirectoryService {
     client;
 
 
-    createLDAPClient() {
-        this.client = ldap.createClient({
-            url: `ldap://${DOMAIN_NAME}.${DOMAIN_END}`
+    async createLDAPClient() {
+        this.client = await ldap.createClient({
+            url: `ldaps://${DOMAIN_NAME}.${DOMAIN_END}:636`,
+            tlsOptions: {
+                rejectUnauthorized: false
+            }
         });
         this.client.on('error', (err) => {
             console.log(err);
@@ -75,7 +77,7 @@ export class ActiveDirectoryService {
                     resolve(user);
                 });
             });
-            return {...user, group: await this.getUserGroup(body.username)}
+            return { ...user, group: await this.getUserGroup(body.username) }
         }
         catch (err) {
             console.error('Authentication failed');
@@ -122,15 +124,19 @@ export class ActiveDirectoryService {
         }
     }
 
-    async clientBind() {
-        await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
-            if (err) {
-                console.log("binding error " + err);
-            }
-            else {
-                console.log("binded");
-            }
-        });
+    async clientBind() {//notice zvi
+        const bind = await new Promise(async (resolve, reject) => {
+            await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
+                if (err) {
+                    console.log("binding error " + err);
+                    reject("error");
+                }
+                else {
+                    console.log("binded");
+                    resolve("binded");
+                }
+            });
+        })
     }
 
     async modifyUser(body: UserDTO[]) {
@@ -150,7 +156,7 @@ export class ActiveDirectoryService {
                     displayName: `${newUser.username} ${newUser.sn}`,
                 }
             };
-            this.client.modify(currentDN, change, (err) => {
+            await this.client.modify(currentDN, change, (err) => {
                 if (err) {
                     console.log(err);
                     return "error";
@@ -178,61 +184,60 @@ export class ActiveDirectoryService {
             console.log(err);
         }
     }
-
     async createUser(body: UserDTO): Promise<string> {
         try {
-            await this.clientBind();
-            const entry = {
-                userPrincipalName: `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
-                sAMAccountName: body.username,
-                givenName: body.username,
-                sn: body.sn,
-                displayName: `${body.username} ${body.sn}`,
-                objectClass: 'user'
-
-            };
-            const res = await new Promise((resolve, reject) => {
-                this.client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
-                    if (addErr) {
-                        console.log("not created " + addErr);
-                        return reject(addErr);
+            let user: UserDTO = await new Promise((resolve, reject) => {
+                this.activeDirectory.findUser(body.username, (err, user) => {
+                    if (err) {
+                        console.log('ERROR: ' + JSON.stringify(err));
+                        return reject('fail');
                     }
+                    resolve(user);
                 });
-                console.log('User created successfully');
-                resolve("success");
             });
-            if (res) {
-                // await new Promise((resolve, reject) => {
-                //     const change = {
-                //         operation: 'replace',
-                //         modification: {
-                //             userAccountControl: 512
-                //         }
-                //     }
-                //     client.modify(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-                //         if (addErr) {
-                //             console.log("not changed " + addErr);
-                //             return reject("fail");
-                //         }
-                //         console.log('User changed successfully');
-                //         resolve("success");
-                //     });
-                // });
-                if (body.group != 'users') {
-                    await this.addToGroup(body.username, body.group);
-                }
-                const now: string[] = ((new Date()).toLocaleDateString()).split('/');
-                return JSON.stringify({
+            if (!user) {
+                const utf16Buffer = Buffer.from('"Turhmch123"', 'utf16le');
+                await this.clientBind();
+                const entry = {
                     userPrincipalName: `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
+                    sAMAccountName: body.username,
                     givenName: body.username,
                     sn: body.sn,
-                    isEdit: false,
-                    whenCreated: `${now[2]}${now[1]}${now[0]}`,
-                    group: body.group
+                    displayName: `${body.username} ${body.sn}`,
+                    objectClass: 'user',
+                    userAccountControl: 512,
+                    unicodePwd: utf16Buffer
+                };
+                const res = await new Promise(async (resolve, reject) => {
+                    await this.client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
+                        if (addErr) {
+                            console.log("not created " + addErr);
+                            return reject("fail");
+                        }
+                    });
+                    console.log('User created successfully');
+                    resolve("success");
                 });
+                if (res != "fail") {
+                    if (body.group != 'users') {
+                        await this.addToGroup(body.username, body.group);
+                    }
+                    const now: string[] = ((new Date()).toLocaleDateString()).split('/');
+                    return JSON.stringify({
+                        userPrincipalName: `${body.username}@${DOMAIN_NAME}.${DOMAIN_END}`,
+                        givenName: body.username,
+                        sn: body.sn,
+                        isEdit: false,
+                        whenCreated: `${now[2]}${now[1]}${now[0]}`,
+                        group: body.group
+                    });
+                }
+                else {
+                    return "fail";
+                }
             }
             else {
-                return "error"
+                return 'fail';
             }
         }
         catch (error) {
@@ -244,8 +249,8 @@ export class ActiveDirectoryService {
     async deleteUser(name: string): Promise<string> {
         try {
             await this.clientBind();
-            const res = await new Promise((resolve, reject) => {
-                this.client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
+            const res = await new Promise(async (resolve, reject) => {
+                await this.client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
                     if (addErr) {
                         console.log("not deleted " + addErr);
                         return reject("fail");
@@ -275,6 +280,17 @@ export class ActiveDirectoryService {
                     member: `cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`
                 }
             };
+            if (group == 'managers') {
+                await new Promise((resolve, reject) => {
+                    this.client.modify(`cn=Domain Admins,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                        if (addErr) {
+                            reject(addErr);
+                        }
+                        console.log('group added successfully');
+                        resolve("success");
+                    });
+                });
+            }
 
             const res = await new Promise((resolve, reject) => {
                 this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
@@ -326,6 +342,18 @@ export class ActiveDirectoryService {
                 }
 
             };
+            if (group == 'managers') {
+                await new Promise((resolve, reject) => {
+                    this.client.modify(`cn=Domain Admins,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
+                        if (addErr) {
+                            return reject(addErr);
+                        }
+                        console.log('group deleted successfully');
+                        resolve("success");
+                    });
+                });
+            }
+
             const res = await new Promise((resolve, reject) => {
                 this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
                     if (addErr) {

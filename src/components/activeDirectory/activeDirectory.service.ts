@@ -2,8 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { resolve } from 'path';
 import { UserDTO } from 'src/common/user.dto';
 
+const ActiveDirectory = require('activedirectory');
 const ldap = require('ldapjs');
-var ActiveDirectory = require('activedirectory');
+const bunyan = require('bunyan');
+const logstashStream = require('bunyan-logstash-tcp').createStream({
+    host: '127.0.0.1',
+    port: 5000
+});
+const logger = bunyan.createLogger({
+    elasticIndex: 'auth-service',
+    name: 'auth-service',
+    category: 'code',
+    streams: [{
+        stream: logstashStream
+    }],
+});
 
 const ADMIN_USER: string = "ori";
 const ADMIN_PASWORD: string = "Turhmch123";
@@ -34,7 +47,7 @@ export class ActiveDirectoryService {
             }
         });
         this.client.on('error', (err) => {
-            console.log(err);
+            logger.error({ category: 'ldapjs' }, err);
             this.createLDAPClient();
         });
     }
@@ -43,7 +56,7 @@ export class ActiveDirectoryService {
         return await new Promise<string>((resolve, reject) => {
             this.activeDirectory.findUsers((err, users) => {
                 if (err) {
-                    console.log(err);
+                    logger.error({ category: 'active directory' }, err);
                     reject("error");
                 }
                 else {
@@ -61,18 +74,16 @@ export class ActiveDirectoryService {
             await new Promise((resolve, reject) => {
                 this.activeDirectory.authenticate(username, password, (err, auth) => {
                     if (err) {
-                        console.log('ERROR: ' + JSON.stringify(err));
-                        return reject('fail');
+                        return reject(JSON.stringify(err));
                     }
                     resolve(auth);
                 });
             });
-            console.log('Authenticated!');
+            logger.info('user: ' + username + ' authanticated successfully');
             let user: UserDTO = await new Promise((resolve, reject) => {
                 this.activeDirectory.findUser(username, (err, user) => {
                     if (err) {
-                        console.log('ERROR: ' + JSON.stringify(err));
-                        return reject('fail');
+                        return reject(JSON.stringify(err));
                     }
                     resolve(user);
                 });
@@ -80,7 +91,7 @@ export class ActiveDirectoryService {
             return { ...user, group: await this.getUserGroup(body.username) }
         }
         catch (err) {
-            console.error('Authentication failed');
+            logger.error({ category: 'active directory' }, err);
             return err;
         }
     }
@@ -104,8 +115,7 @@ export class ActiveDirectoryService {
             const res = await new Promise((resolve, reject) => {
                 this.activeDirectory.isUserMemberOf(user, groupName, (err, isMember) => {
                     if (err) {
-                        console.log('ERROR: ' + JSON.stringify(err));
-                        return reject(err);
+                        return reject(JSON.stringify(err));
                     }
                     resolve(isMember);
                 });
@@ -119,20 +129,20 @@ export class ActiveDirectoryService {
 
         }
         catch (err) {
-            console.log(err);
+            logger.error({ category: 'active directory' }, err);
             return "error";
         }
     }
 
-    async clientBind() {//notice zvi
+    async clientBind() {
         const bind = await new Promise(async (resolve, reject) => {
             await this.client.bind(`cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, ADMIN_PASWORD, (err) => {
                 if (err) {
-                    console.log("binding error " + err);
+                    logger.error({ category: 'ldapjs' }, err);
                     reject("error");
                 }
                 else {
-                    console.log("binded");
+                    logger.info(`client: cn=${ADMIN_USER},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END} binded`);
                     resolve("binded");
                 }
             });
@@ -158,14 +168,14 @@ export class ActiveDirectoryService {
             };
             await this.client.modify(currentDN, change, (err) => {
                 if (err) {
-                    console.log(err);
+                    logger.error({ category: 'ldapjs' }, err);
                     return "error";
                 }
             });
             if (newUser.username != oldUser.username) {
                 this.client.modifyDN(currentDN, newDN, (err) => {
                     if (err) {
-                        console.log(err);
+                        logger.error({ category: 'ldapjs' }, err);
                         return "error";
                     }
                 });
@@ -185,16 +195,22 @@ export class ActiveDirectoryService {
         }
     }
     async createUser(body: UserDTO): Promise<string> {
+        let user: UserDTO;
         try {
-            let user: UserDTO = await new Promise((resolve, reject) => {
+            user = await new Promise((resolve, reject) => {
                 this.activeDirectory.findUser(body.username, (err, user) => {
                     if (err) {
-                        console.log('ERROR: ' + JSON.stringify(err));
-                        return reject('fail');
+                        return reject(JSON.stringify(err));
                     }
                     resolve(user);
                 });
             });
+        }
+        catch (err) {
+            logger.error({category: 'active directory'}, err);
+            return 'fail';
+        }
+        try {
             if (!user) {
                 const utf16Buffer = Buffer.from('"Turhmch123"', 'utf16le');
                 await this.clientBind();
@@ -209,13 +225,12 @@ export class ActiveDirectoryService {
                     unicodePwd: utf16Buffer
                 };
                 const res = await new Promise(async (resolve, reject) => {
-                    await this.client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (addErr) => {
-                        if (addErr) {
-                            console.log("not created " + addErr);
-                            return reject("fail");
+                    await this.client.add(`cn=${body.username},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, entry, (err) => {
+                        if (err) {
+                            return reject(err);
                         }
                     });
-                    console.log('User created successfully');
+                    logger.info('user: ' + body.username + ' has been created');
                     resolve("success");
                 });
                 if (res != "fail") {
@@ -240,8 +255,8 @@ export class ActiveDirectoryService {
                 return 'fail';
             }
         }
-        catch (error) {
-            console.log('An error occurred:' + error);
+        catch (err) {
+            logger.error({category: 'ldapjs'}, err);
             return "error";
         }
     }
@@ -250,12 +265,11 @@ export class ActiveDirectoryService {
         try {
             await this.clientBind();
             const res = await new Promise(async (resolve, reject) => {
-                await this.client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (addErr) => {
-                    if (addErr) {
-                        console.log("not deleted " + addErr);
-                        return reject("fail");
+                await this.client.del(`cn=${name},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, (err) => {
+                    if (err) {
+                        return reject(err);
                     }
-                    console.log('User deleted successfully');
+                    logger.info('user: ' + name + ' has been deleted');
                     resolve("success");
                 });
             });
@@ -266,8 +280,8 @@ export class ActiveDirectoryService {
                 return "error"
             }
         }
-        catch (error) {
-            console.log('An error occurred:' + error);
+        catch (err) {
+            logger.error({category: 'ldapjs'}, err);
             return "error";
         }
     }
@@ -282,22 +296,22 @@ export class ActiveDirectoryService {
             };
             if (group == 'managers') {
                 await new Promise((resolve, reject) => {
-                    this.client.modify(`cn=Domain Admins,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-                        if (addErr) {
-                            reject(addErr);
+                    this.client.modify(`cn=Domain Admins,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (err) => {
+                        if (err) {
+                            reject(err);
                         }
-                        console.log('group added successfully');
+                        logger.info('user: ' + name + ' has been added to administrators');
                         resolve("success");
                     });
                 });
             }
 
             const res = await new Promise((resolve, reject) => {
-                this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-                    if (addErr) {
-                        return reject(addErr);
+                this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (err) => {
+                    if (err) {
+                        return reject(err);
                     }
-                    console.log('group added successfully');
+                    logger.info('user: ' + name + ' has been added to group: ' + group);
                     resolve("success");
                 });
             });
@@ -308,8 +322,8 @@ export class ActiveDirectoryService {
                 return "error";
             }
         }
-        catch (error) {
-            console.log('not added:' + error);
+        catch (err) {
+            logger.error({category: 'ldapjs'}, err);
             return "error";
         }
     }
@@ -344,22 +358,22 @@ export class ActiveDirectoryService {
             };
             if (group == 'managers') {
                 await new Promise((resolve, reject) => {
-                    this.client.modify(`cn=Domain Admins,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-                        if (addErr) {
-                            return reject(addErr);
+                    this.client.modify(`cn=Domain Admins,cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (err) => {
+                        if (err) {
+                            return reject(err);
                         }
-                        console.log('group deleted successfully');
+                        logger.info('user: ' + name + ' has been deleted from administrators');
                         resolve("success");
                     });
                 });
             }
 
             const res = await new Promise((resolve, reject) => {
-                this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (addErr) => {
-                    if (addErr) {
-                        return reject(addErr);
+                this.client.modify(`cn=${group},cn=Users,dc=${DOMAIN_NAME},dc=${DOMAIN_END}`, change, (err) => {
+                    if (err) {
+                        return reject(err);
                     }
-                    console.log('group deleted successfully');
+                    logger.info('user: ' + name + ' has been deleted from group: ' + group);
                     resolve("success");
                 });
             });
@@ -370,8 +384,8 @@ export class ActiveDirectoryService {
                 return "error";
             }
         }
-        catch (error) {
-            console.log('not deleted:' + error);
+        catch (err) {
+            logger.error({category: 'ldapjs'}, err);
             return "error";
         }
     }

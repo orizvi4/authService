@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Post, Put, Query } from '@nestjs/common';
 import { ActiveDirectoryService } from './activeDirectory.service';
-import { UserDTO } from 'src/common/user.dto';
+import { UserDTO } from 'src/common/models/user.dto';
 
 @Controller()
 export class ActiveDirectoryController {

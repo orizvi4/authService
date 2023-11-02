@@ -31,10 +31,11 @@ export class ActiveDirectoryService {
                 rejectUnauthorized: false
             }
         });
-        this.client.on('error', (err) => {
+        this.client.on('error', async (err) => {
             if (!reconnect) {
                 this.loggerService.logError(err.message, 'ldapjs');
             }
+            await new Promise((resolve) => { setTimeout(resolve, 2500) });
             this.createLDAPClient(true);
         });
     }

@@ -3,7 +3,7 @@ import axios from "axios";
 import { Constants } from "../constants.class";
 
 @Injectable()
-export class LoggerService {
+export class LoggerService {//error handling
     logInfo(message: string) {
         axios.post<void>(`${Constants.LOGGER_SERVICE}/info`, {message: message, elasticIndex: Constants.ELASTIC_INDEX});
     }

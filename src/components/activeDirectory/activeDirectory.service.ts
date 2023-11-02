@@ -53,7 +53,7 @@ export class ActiveDirectoryService {
         });
     }
 
-    async authenticate(body: UserDTO): Promise<UserDTO> {
+    async authenticate(body: UserDTO): Promise<UserDTO | string> {
         let username: string = `${body.username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`;
         let password: string = body.password;
 
@@ -80,7 +80,7 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             this.loggerService.logError(err.message, 'active directory');
-            return err;
+            return 'fail';
         }
     }
     async getUserGroup(username: string): Promise<string> {

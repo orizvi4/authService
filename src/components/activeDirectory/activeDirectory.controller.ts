@@ -11,7 +11,7 @@ export class ActiveDirectoryController {
     return await this.activeDirectoryService.getUsers();
   }
   @Post("/users/authenticate")
-  async authenticate(@Body() body: UserDTO): Promise<UserDTO> {
+  async authenticate(@Body() body: UserDTO): Promise<UserDTO | string> {
     return await this.activeDirectoryService.authenticate(body);
   }
   @Get("/groups/authenticate")

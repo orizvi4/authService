@@ -62,7 +62,7 @@ export class ActiveDirectoryService {
             await new Promise((resolve, reject) => {
                 this.activeDirectory.authenticate(username, password, (err, auth) => {
                     if (err) {
-                        return reject(JSON.stringify(err));
+                        return reject(err);
                     }
                     resolve(auth);
                 });
@@ -72,7 +72,7 @@ export class ActiveDirectoryService {
             let user: UserDTO = await new Promise((resolve, reject) => {
                 this.activeDirectory.findUser(username, (err, user) => {
                     if (err) {
-                        return reject(JSON.stringify(err));
+                        return reject(err);
                     }
                     resolve(user);
                 });
@@ -81,6 +81,9 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             this.loggerService.logError(err.message, 'active directory');
+            if (err.errno = -3008) {
+                return 'error'
+            }
             return 'fail';
         }
     }
@@ -104,7 +107,7 @@ export class ActiveDirectoryService {
             const res = await new Promise((resolve, reject) => {
                 this.activeDirectory.isUserMemberOf(user, groupName, (err, isMember) => {
                     if (err) {
-                        return reject(JSON.stringify(err));
+                        return reject(err);
                     }
                     resolve(isMember);
                 });
@@ -180,7 +183,8 @@ export class ActiveDirectoryService {
             });
         }
         catch (err) {
-            console.log(err);
+            this.loggerService.logError(err.message, 'ldapjs');
+            return 'error';
         }
     }
     async createUser(body: UserDTO): Promise<string> {
@@ -189,7 +193,7 @@ export class ActiveDirectoryService {
             user = await new Promise((resolve, reject) => {
                 this.activeDirectory.findUser(body.username, (err, user) => {
                     if (err) {
-                        return reject(JSON.stringify(err));
+                        return reject(err);
                     }
                     resolve(user);
                 });

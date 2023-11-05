@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { resolve } from 'path';
 import { Constants } from 'src/common/constants.class';
 import { UserDTO } from 'src/common/models/user.dto';
@@ -10,7 +11,7 @@ const ldap = require('ldapjs');
 
 @Injectable()
 export class ActiveDirectoryService {
-    constructor(private loggerService: LoggerService) {
+    constructor(private loggerService: LoggerService, private jwtService: JwtService) {
         this.createLDAPClient();
     }
     config = {
@@ -45,7 +46,7 @@ export class ActiveDirectoryService {
             this.activeDirectory.findUsers((err, users) => {
                 if (err) {
                     this.loggerService.logError(err.message, 'active directory');
-                    reject("error");
+                    reject(new InternalServerErrorException());
                 }
                 else {
                     resolve(JSON.stringify(users.slice(3)));
@@ -54,7 +55,7 @@ export class ActiveDirectoryService {
         });
     }
 
-    async authenticate(body: UserDTO): Promise<UserDTO | string> {
+    async authenticate(body: UserDTO): Promise<UserDTO | string | any> {
         let username: string = `${body.username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`;
         let password: string = body.password;
 
@@ -77,14 +78,16 @@ export class ActiveDirectoryService {
                     resolve(user);
                 });
             });
-            return { ...user, group: await this.getUserGroup(body.username) }
+            const payload = { username: user.username };
+            const access_token = await this.jwtService.signAsync(payload);//still here
+            return { ...user, group: await this.getUserGroup(body.username), access_token: access_token }
         }
         catch (err) {
             this.loggerService.logError(err.message, 'active directory');
             if (err.errno = -3008) {
-                return 'error'
+                throw new InternalServerErrorException();
             }
-            return 'fail';
+            throw new UnauthorizedException();
         }
     }
     async getUserGroup(username: string): Promise<string> {
@@ -94,13 +97,13 @@ export class ActiveDirectoryService {
                 return group;
             }
             else if (res == 'error') {
-                return 'error';
+                throw new InternalServerErrorException();
             }
         }
         return 'users';
     }
 
-    async memberOf(username: string, group: string): Promise<string | boolean> {
+    private async memberOf(username: string, group: string): Promise<string | boolean> {
         let user = `${username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`;
         let groupName = `${group}`;
         try {

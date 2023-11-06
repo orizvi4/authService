@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { resolve } from 'path';
 import { Constants } from 'src/common/constants.class';
@@ -84,7 +84,7 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             this.loggerService.logError(err.message, 'active directory');
-            if (err.errno = -3008) {
+            if (err.errno == -3008) {
                 throw new InternalServerErrorException();
             }
             throw new UnauthorizedException();
@@ -92,22 +92,24 @@ export class ActiveDirectoryService {
     }
     async getUserGroup(username: string): Promise<string> {
         for (const group of this.groups) {
-            const res: boolean | string = await this.memberOf(username, group);
-            if (res == true) {
-                return group;
+            try {
+                const res: boolean = await this.memberOf(username, group);
+                if (res == true) {
+                    return group;
+                }
             }
-            else if (res == 'error') {
-                throw new InternalServerErrorException();
+            catch(err) {
+                throw err;
             }
         }
         return 'users';
     }
 
-    private async memberOf(username: string, group: string): Promise<string | boolean> {
+    private async memberOf(username: string, group: string): Promise<boolean> {
         let user = `${username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`;
         let groupName = `${group}`;
         try {
-            const res = await new Promise((resolve, reject) => {
+            const res: boolean = await new Promise((resolve, reject) => {
                 this.activeDirectory.isUserMemberOf(user, groupName, (err, isMember) => {
                     if (err) {
                         return reject(err);
@@ -115,17 +117,12 @@ export class ActiveDirectoryService {
                     resolve(isMember);
                 });
             });
-            if (res) {
-                return true;
-            }
-            else {
-                return false;
-            }
+            return res;
 
         }
         catch (err) {
             this.loggerService.logError(err.message, 'active directory');
-            return "error";
+            throw new InternalServerErrorException();
         }
     }
 
@@ -161,21 +158,24 @@ export class ActiveDirectoryService {
                     displayName: `${newUser.username} ${newUser.sn}`,
                 }
             };
-            await this.client.modify(currentDN, change, (err) => {
-                if (err) {
-                    this.loggerService.logError(err.message, 'ldapjs');
-                    return "error";
-                }
+            await new Promise((resolve, reject) => {
+                this.client.modify(currentDN, change, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+                    resolve('success');
+                });
             });
             if (newUser.username != oldUser.username) {
-                this.client.modifyDN(currentDN, newDN, (err) => {
-                    if (err) {
-                        this.loggerService.logError(err.message, 'ldapjs');
-                        return "error";
-                    }
+                await new Promise((resolve, reject) => {
+                    this.client.modifyDN(currentDN, newDN, (err) => {
+                        if (err) {
+                            return reject(err);
+                        }
+                    });
+                    resolve('success');
                 });
             }
-
             await this.updateGroupOfUser(newUser.username, newUser.group);
             return JSON.stringify({
                 userPrincipalName: `${newUser.username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
@@ -187,9 +187,10 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             this.loggerService.logError(err.message, 'ldapjs');
-            return 'error';
+            throw new InternalServerErrorException();
         }
     }
+
     async createUser(body: UserDTO): Promise<string> {
         let user: UserDTO;
         try {
@@ -204,7 +205,7 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             this.loggerService.logError(err.message, 'active directory');
-            return 'fail';
+            throw new InternalServerErrorException();
         }
         try {
             if (!user) {
@@ -229,7 +230,7 @@ export class ActiveDirectoryService {
                     this.loggerService.logInfo('user: ' + body.username + ' has been created');
                     resolve("success");
                 });
-                if (res != "fail") {
+                if (res == "success") {
                     if (body.group != 'users') {
                         await this.addToGroup(body.username, body.group);
                     }
@@ -243,24 +244,21 @@ export class ActiveDirectoryService {
                         group: body.group
                     });
                 }
-                else {
-                    return "fail";
-                }
             }
             else {
-                return 'fail';
+                throw new ForbiddenException();
             }
         }
         catch (err) {
             this.loggerService.logError(err.message, 'ldapjs');
-            return "error";
+            throw new InternalServerErrorException();
         }
     }
 
     async deleteUser(name: string): Promise<string> {
         try {
             await this.clientBind();
-            const res = await new Promise(async (resolve, reject) => {
+            return await new Promise(async (resolve, reject) => {
                 await this.client.del(`cn=${name},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, (err) => {
                     if (err) {
                         return reject(err);
@@ -269,20 +267,14 @@ export class ActiveDirectoryService {
                     resolve("success");
                 });
             });
-            if (res) {
-                return "success";
-            }
-            else {
-                return "error"
-            }
         }
         catch (err) {
             this.loggerService.logError(err.message, 'ldapjs');
-            return "error";
+            throw new InternalServerErrorException();
         }
     }
 
-    async addToGroup(name: string, group: string): Promise<string> {
+    private async addToGroup(name: string, group: string): Promise<string> {
         try {
             const change = {
                 operation: 'add',
@@ -301,8 +293,7 @@ export class ActiveDirectoryService {
                     });
                 });
             }
-
-            const res = await new Promise((resolve, reject) => {
+            return await new Promise((resolve, reject) => {
                 this.client.modify(`cn=${group},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, change, (err) => {
                     if (err) {
                         return reject(err);
@@ -311,40 +302,39 @@ export class ActiveDirectoryService {
                     resolve("success");
                 });
             });
-            if (res) {
-                return "success";
-            }
-            else {
-                return "error";
-            }
         }
         catch (err) {
             this.loggerService.logError(err.message, 'ldapjs');
-            return "error";
+            throw new InternalServerErrorException();
         }
     }
 
-    async updateGroupOfUser(name: string, newGroup: string) {
-        for (const group of this.groups) {
-            if (newGroup != 'users') {
-                if (group != newGroup && await this.memberOf(name, group)) {
-                    await this.deleteFromGroup(name, group);
-                }
-                else if (group == newGroup && !(await this.memberOf(name, group))) {
-                    await this.addToGroup(name, group);
-                }
-            }
-            else {
-                if (await this.memberOf(name, group)) {
-                    await this.deleteFromGroup(name, group);
-                }
-            }
-        }
-    }
-
-    async deleteFromGroup(name: string, group: string): Promise<string> {
+    private async updateGroupOfUser(name: string, newGroup: string) {
         try {
-            this.clientBind();
+            for (const group of this.groups) {
+                if (newGroup != 'users') {
+                    if (group != newGroup && await this.memberOf(name, group)) {
+                        await this.deleteFromGroup(name, group);
+                    }
+                    else if (group == newGroup && !(await this.memberOf(name, group))) {
+                        await this.addToGroup(name, group);
+                    }
+                }
+                else {
+                    if (await this.memberOf(name, group)) {
+                        await this.deleteFromGroup(name, group);
+                    }
+                }
+            }
+        }
+        catch (err: any) {
+            throw err;
+        }
+    }
+
+    private async deleteFromGroup(name: string, group: string): Promise<string> {
+        try {
+            await this.clientBind();
             const change = {
                 operation: 'delete',
                 modification: {
@@ -364,7 +354,7 @@ export class ActiveDirectoryService {
                 });
             }
 
-            const res = await new Promise((resolve, reject) => {
+            return await new Promise((resolve, reject) => {
                 this.client.modify(`cn=${group},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, change, (err) => {
                     if (err) {
                         return reject(err);
@@ -373,16 +363,10 @@ export class ActiveDirectoryService {
                     resolve("success");
                 });
             });
-            if (res) {
-                return "success";
-            }
-            else {
-                return "error";
-            }
         }
         catch (err) {
             this.loggerService.logError(err.message, 'ldapjs');
-            return "error";
+            throw new InternalServerErrorException();
         }
     }
 }

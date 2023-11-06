@@ -15,15 +15,15 @@ export class ActiveDirectoryController {
     return await this.activeDirectoryService.authenticate(body);
   }
   @Post("/users/add")
-  async addUser(@Body() body: UserDTO) {//needs to be done exceptions
+  async addUser(@Body() body: UserDTO) {
     return await this.activeDirectoryService.createUser(body);
   }
   @Delete("/users/delete")
-  async deleteUser(@Query("username") username: string) {//needs to be done exceptions
+  async deleteUser(@Query("username") username: string) {
     return await this.activeDirectoryService.deleteUser(username);
   }
   @Put("/users/modify")
-  async modifyUser(@Body() body: UserDTO[]): Promise<string> {//needs to be done exceptions
+  async modifyUser(@Body() body: UserDTO[]): Promise<string> {
     return (await this.activeDirectoryService.modifyUser(body))
   }
   @Get('/groups/user')

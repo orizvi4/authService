@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { resolve } from 'path';
 import { Constants } from 'src/common/constants.class';
@@ -98,7 +98,7 @@ export class ActiveDirectoryService {
                     return group;
                 }
             }
-            catch(err) {
+            catch (err) {
                 throw err;
             }
         }
@@ -158,14 +158,6 @@ export class ActiveDirectoryService {
                     displayName: `${newUser.username} ${newUser.sn}`,
                 }
             };
-            await new Promise((resolve, reject) => {
-                this.client.modify(currentDN, change, (err) => {
-                    if (err) {
-                        return reject(err);
-                    }
-                    resolve('success');
-                });
-            });
             if (newUser.username != oldUser.username) {
                 await new Promise((resolve, reject) => {
                     this.client.modifyDN(currentDN, newDN, (err) => {
@@ -176,6 +168,14 @@ export class ActiveDirectoryService {
                     resolve('success');
                 });
             }
+            await new Promise((resolve, reject) => {
+                this.client.modify(currentDN, change, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+                    resolve('success');
+                });
+            });
             await this.updateGroupOfUser(newUser.username, newUser.group);
             return JSON.stringify({
                 userPrincipalName: `${newUser.username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
@@ -186,8 +186,13 @@ export class ActiveDirectoryService {
             });
         }
         catch (err) {
-            this.loggerService.logError(err.message, 'ldapjs');
-            throw new InternalServerErrorException();
+            if (err == 'error') {
+                throw new InternalServerErrorException();
+            }
+            else {
+                this.loggerService.logError(err.message, 'ldapjs');
+                throw new BadRequestException();
+            }
         }
     }
 
@@ -251,6 +256,9 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             this.loggerService.logError(err.message, 'ldapjs');
+            if (err.status == 403) {
+                throw new ForbiddenException();
+            }
             throw new InternalServerErrorException();
         }
     }

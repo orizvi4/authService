@@ -25,6 +25,11 @@ export class ActiveDirectoryService {
     client;
 
 
+    async refreshToken(username: string) {
+        const payload = { username: username, group: await this.getUserGroup(username) };
+        return await this.jwtService.signAsync(payload, {secret: Constants.JWT_SECRET, expiresIn: '30s'})
+    }
+
     async createLDAPClient(reconnect: boolean = false) {
         this.client = await ldap.createClient({
             url: `ldaps://${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}:636`,
@@ -78,9 +83,11 @@ export class ActiveDirectoryService {
                     resolve(user);
                 });
             });
-            const payload = { username: user.username };
-            const access_token = await this.jwtService.signAsync(payload);//still here
-            return { ...user, group: await this.getUserGroup(body.username), access_token: access_token }
+            const group = await this.getUserGroup(body.username);
+            const payload = { username: user.username, group: group };
+            const accessToken = await this.jwtService.signAsync(payload, {secret: Constants.JWT_SECRET, expiresIn: '30s'});
+            const refreshToken = await this.jwtService.signAsync(payload, {secret: Constants.JWT_SECRET, expiresIn: '7d'});
+            return { ...user, group: group, accessToken: accessToken, refreshToken: refreshToken }
         }
         catch (err) {
             this.loggerService.logError(err.message, 'active directory');

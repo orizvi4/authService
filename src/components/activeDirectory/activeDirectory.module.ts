@@ -4,14 +4,11 @@ import { ActiveDirectoryService } from './activeDirectory.service';
 import { LoggerService } from 'src/common/services/logger.service';
 import { JwtModule } from '@nestjs/jwt';
 import { Constants } from 'src/common/constants.class';
+import { AuthGuard } from 'src/common/guards/auth.guard';
 
 @Module({
-  imports: [JwtModule.register({
-    global: true,
-    secret: Constants.JWT_SECRET,
-    signOptions: { expiresIn: '60s' },
-  })],
+  imports: [JwtModule.register({})],
   controllers: [ActiveDirectoryController],
-  providers: [ActiveDirectoryService, LoggerService],
+  providers: [ActiveDirectoryService, LoggerService, AuthGuard],
 })
 export class ActiveDirectoryModule {}

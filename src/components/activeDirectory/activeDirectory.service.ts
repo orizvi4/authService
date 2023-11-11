@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { resolve } from 'path';
 import { Constants } from 'src/common/constants.class';
 import { UserDTO } from 'src/common/models/user.dto';
+import { AuthTokenService } from 'src/common/services/AuthToken.service';
 import { LoggerService } from 'src/common/services/logger.service';
 
 const ActiveDirectory = require('activedirectory');
@@ -11,7 +12,7 @@ const ldap = require('ldapjs');
 
 @Injectable()
 export class ActiveDirectoryService {
-    constructor(private loggerService: LoggerService, private jwtService: JwtService) {
+    constructor(private loggerService: LoggerService, private authTokenService: AuthTokenService) {
         this.createLDAPClient();
     }
     config = {
@@ -27,7 +28,12 @@ export class ActiveDirectoryService {
 
     async refreshToken(username: string) {
         const payload = { username: username, group: await this.getUserGroup(username) };
-        return await this.jwtService.signAsync(payload, {secret: Constants.JWT_SECRET, expiresIn: '30s'})
+        return await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
+    }
+
+    async addToBlackList(accessToken: string, refreshToken: string) {
+        this.authTokenService.addToBlackList(accessToken);
+        this.authTokenService.addToBlackList(refreshToken);
     }
 
     async createLDAPClient(reconnect: boolean = false) {
@@ -85,8 +91,8 @@ export class ActiveDirectoryService {
             });
             const group = await this.getUserGroup(body.username);
             const payload = { username: user.username, group: group };
-            const accessToken = await this.jwtService.signAsync(payload, {secret: Constants.JWT_SECRET, expiresIn: '30s'});
-            const refreshToken = await this.jwtService.signAsync(payload, {secret: Constants.JWT_SECRET, expiresIn: '7d'});
+            const accessToken = await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
+            const refreshToken = await this.authTokenService.sign(payload, Constants.REFRESH_TOKEN_EXPIRE);
             return { ...user, group: group, accessToken: accessToken, refreshToken: refreshToken }
         }
         catch (err) {

@@ -20,7 +20,6 @@ export class ActiveDirectoryController {
     return await this.activeDirectoryService.refreshToken(body.username);
   }
 
-  @UseGuards(AuthGuard)
   @Post('/users/logout')
   async addToBlackList(@Body() body): Promise<void> {
     await this.activeDirectoryService.addToBlackList(body.refreshToken, body.accessToken);

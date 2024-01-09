@@ -44,7 +44,7 @@ export class ActiveDirectoryService {
 
         this.client.on('error', async (err) => {
             if (!reconnect) {
-                this.loggerService.logError(err.message, 'ldapjs');
+                LoggerService.logError(err.message, 'ldapjs');
             }
             await new Promise((resolve) => { setTimeout(resolve, 2500) });
             this.createLDAPClient(true);
@@ -55,7 +55,7 @@ export class ActiveDirectoryService {
         return await new Promise<string>((resolve, reject) => {
             this.activeDirectory.findUsers((err, users: Array<any>) => { // try active directory user
                 if (err) {
-                    this.loggerService.logError(err.message, 'active directory');
+                    LoggerService.logError(err.message, 'active directory');
                     reject(new InternalServerErrorException());
                 }
                 else {
@@ -81,7 +81,7 @@ export class ActiveDirectoryService {
                 });
             });
 
-            this.loggerService.logInfo('user: ' + username + ' authanticated successfully');
+            LoggerService.logInfo('user: ' + username + ' authanticated successfully');
 
             let user: UserDTO = await new Promise((resolve, reject) => {
                 this.activeDirectory.findUser(username, (err, user) => {
@@ -98,7 +98,7 @@ export class ActiveDirectoryService {
             return { ...user, group: group, accessToken: accessToken, refreshToken: refreshToken }
         }
         catch (err) {
-            this.loggerService.logError(err.message, 'active directory');
+            LoggerService.logError(err.message, 'active directory');
             if (err.errno == -3008) {
                 throw new InternalServerErrorException();
             }
@@ -136,7 +136,7 @@ export class ActiveDirectoryService {
 
         }
         catch (err) {
-            this.loggerService.logError(err.message, 'active directory');
+            LoggerService.logError(err.message, 'active directory');
             throw new InternalServerErrorException();
         }
     }
@@ -145,11 +145,11 @@ export class ActiveDirectoryService {
         const bind = await new Promise(async (resolve, reject) => {
             await this.client.bind(`cn=${Constants.ADMIN_USER},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, Constants.ADMIN_PASWORD, (err) => {
                 if (err) {
-                    this.loggerService.logError(err.message, 'ldapjs');
+                    LoggerService.logError(err.message, 'ldapjs');
                     reject("error");
                 }
                 else {
-                    this.loggerService.logInfo(`client: cn=${Constants.ADMIN_USER},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END} binded`);
+                    LoggerService.logInfo(`client: cn=${Constants.ADMIN_USER},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END} binded`);
                     resolve("binded");
                 }
             });
@@ -205,7 +205,7 @@ export class ActiveDirectoryService {
                 throw new InternalServerErrorException();
             }
             else {
-                this.loggerService.logError(err.message, 'ldapjs');
+                LoggerService.logError(err.message, 'ldapjs');
                 throw new BadRequestException();
             }
         }
@@ -224,7 +224,7 @@ export class ActiveDirectoryService {
             });
         }
         catch (err) {
-            this.loggerService.logError(err.message, 'active directory');
+            LoggerService.logError(err.message, 'active directory');
             throw new InternalServerErrorException();
         }
         try {
@@ -247,7 +247,7 @@ export class ActiveDirectoryService {
                             return reject(err);
                         }
                     });
-                    this.loggerService.logInfo('user: ' + body.username + ' has been created');
+                    LoggerService.logInfo('user: ' + body.username + ' has been created');
                     resolve("success");
                 });
                 if (res == "success") {
@@ -270,7 +270,7 @@ export class ActiveDirectoryService {
             }
         }
         catch (err) {
-            this.loggerService.logError(err.message, 'ldapjs');
+            LoggerService.logError(err.message, 'ldapjs');
             if (err.status == 403) {
                 throw new ForbiddenException();
             }
@@ -286,13 +286,13 @@ export class ActiveDirectoryService {
                     if (err) {
                         return reject(err);
                     }
-                    this.loggerService.logInfo('user: ' + name + ' has been deleted');
+                    LoggerService.logInfo('user: ' + name + ' has been deleted');
                     resolve("success");
                 });
             });
         }
         catch (err) {
-            this.loggerService.logError(err.message, 'ldapjs');
+            LoggerService.logError(err.message, 'ldapjs');
             throw new InternalServerErrorException();
         }
     }
@@ -311,7 +311,7 @@ export class ActiveDirectoryService {
                         if (err) {
                             reject(err);
                         }
-                        this.loggerService.logInfo('user: ' + name + ' has been added to administrators');
+                        LoggerService.logInfo('user: ' + name + ' has been added to administrators');
                         resolve("success");
                     });
                 });
@@ -321,13 +321,13 @@ export class ActiveDirectoryService {
                     if (err) {
                         return reject(err);
                     }
-                    this.loggerService.logInfo('user: ' + name + ' has been added to group: ' + group);
+                    LoggerService.logInfo('user: ' + name + ' has been added to group: ' + group);
                     resolve("success");
                 });
             });
         }
         catch (err) {
-            this.loggerService.logError(err.message, 'ldapjs');
+            LoggerService.logError(err.message, 'ldapjs');
             throw new InternalServerErrorException();
         }
     }
@@ -371,7 +371,7 @@ export class ActiveDirectoryService {
                         if (err) {
                             return reject(err);
                         }
-                        this.loggerService.logInfo('user: ' + name + ' has been deleted from administrators');
+                        LoggerService.logInfo('user: ' + name + ' has been deleted from administrators');
                         resolve("success");
                     });
                 });
@@ -382,13 +382,13 @@ export class ActiveDirectoryService {
                     if (err) {
                         return reject(err);
                     }
-                    this.loggerService.logInfo('user: ' + name + ' has been deleted from group: ' + group);
+                    LoggerService.logInfo('user: ' + name + ' has been deleted from group: ' + group);
                     resolve("success");
                 });
             });
         }
         catch (err) {
-            this.loggerService.logError(err.message, 'ldapjs');
+            LoggerService.logError(err.message, 'ldapjs');
             throw new InternalServerErrorException();
         }
     }

@@ -1,14 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { resolve } from 'path';
 import { Constants } from 'src/common/constants.class';
 import { UserDTO } from 'src/common/models/user.dto';
 import { AuthTokenService } from 'src/common/services/AuthToken.service';
 import { LoggerService } from 'src/common/services/logger.service';
+// import * as Ad from 'activedirectory/lib/models';
 
 const ActiveDirectory = require('activedirectory');
 const ldap = require('ldapjs');
-
 
 @Injectable()
 export class ActiveDirectoryService {
@@ -22,7 +20,7 @@ export class ActiveDirectoryService {
         password: Constants.ADMIN_PASWORD
     };
     activeDirectory = new ActiveDirectory(this.config);
-    groups: string[] = ['commanders', 'managers'];
+    groups: string[] = ['editors', 'managers'];
     client;
 
 
@@ -43,6 +41,7 @@ export class ActiveDirectoryService {
                 rejectUnauthorized: false
             }
         });
+
         this.client.on('error', async (err) => {
             if (!reconnect) {
                 this.loggerService.logError(err.message, 'ldapjs');
@@ -54,12 +53,14 @@ export class ActiveDirectoryService {
 
     async getUsers(): Promise<string> {
         return await new Promise<string>((resolve, reject) => {
-            this.activeDirectory.findUsers((err, users) => {
+            this.activeDirectory.findUsers((err, users: Array<any>) => { // try active directory user
                 if (err) {
                     this.loggerService.logError(err.message, 'active directory');
                     reject(new InternalServerErrorException());
                 }
                 else {
+                    users = users.filter(user => user.sAMAccountName !== 'admin');
+
                     resolve(JSON.stringify(users.slice(3)));
                 }
             });
@@ -67,8 +68,8 @@ export class ActiveDirectoryService {
     }
 
     async authenticate(body: UserDTO): Promise<UserDTO | string | any> {
-        let username: string = `${body.username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`;
-        let password: string = body.password;
+        const username: string = `${body.username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`;
+        const password: string = body.password;
 
         try {
             await new Promise((resolve, reject) => {
@@ -81,6 +82,7 @@ export class ActiveDirectoryService {
             });
 
             this.loggerService.logInfo('user: ' + username + ' authanticated successfully');
+
             let user: UserDTO = await new Promise((resolve, reject) => {
                 this.activeDirectory.findUser(username, (err, user) => {
                     if (err) {
@@ -227,7 +229,7 @@ export class ActiveDirectoryService {
         }
         try {
             if (!user) {
-                const utf16Buffer = Buffer.from('"Turhmch123"', 'utf16le');
+                // const utf16Buffer = Buffer.from('"Turhmch123"', 'utf16le');
                 await this.clientBind();
                 const entry = {
                     userPrincipalName: `${body.username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
@@ -236,8 +238,8 @@ export class ActiveDirectoryService {
                     sn: body.sn,
                     displayName: `${body.username} ${body.sn}`,
                     objectClass: 'user',
-                    userAccountControl: 512,
-                    unicodePwd: utf16Buffer
+                    userAccountControl: 544,
+                    // unicodePwd: utf16Buffer
                 };
                 const res = await new Promise(async (resolve, reject) => {
                     await this.client.add(`cn=${body.username},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, entry, (err) => {

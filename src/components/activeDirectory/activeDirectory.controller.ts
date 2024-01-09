@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Post, Put, Query, UseGuards } from '@nes
 import { ActiveDirectoryService } from './activeDirectory.service';
 import { UserDTO } from 'src/common/models/user.dto';
 import { AuthGuard } from 'src/common/guards/auth.guard';
+import { EditorGuard } from 'src/common/guards/editor.guard';
+import { ManagerGuard } from 'src/common/guards/manager.guard';
 
 @Controller()
 export class ActiveDirectoryController {
@@ -30,31 +32,43 @@ export class ActiveDirectoryController {
     return true;
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(ManagerGuard)
+  @Get('/tokens/verify/manager')
+  managerVerify(): boolean {
+    return true;
+  }
+
+  @UseGuards(EditorGuard)
+  @Get('/tokens/verify/editor')
+  editorVerify(): boolean {
+    return true;
+  }
+
+  @UseGuards(ManagerGuard)
   @Get("/users")
   async getUsers() {
     return await this.activeDirectoryService.getUsers();
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(ManagerGuard)
   @Post("/users/add")
   async addUser(@Body() body: UserDTO) {
     return await this.activeDirectoryService.createUser(body);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(ManagerGuard)
   @Delete("/users/delete")
   async deleteUser(@Query("username") username: string) {
     return await this.activeDirectoryService.deleteUser(username);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(ManagerGuard)
   @Put("/users/modify")
   async modifyUser(@Body() body: UserDTO[]): Promise<string> {
     return (await this.activeDirectoryService.modifyUser(body))
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(ManagerGuard)
   @Get('/groups/user')
   async getUserGroup(@Query("username") username: string): Promise<string> {
     return await this.activeDirectoryService.getUserGroup(username);

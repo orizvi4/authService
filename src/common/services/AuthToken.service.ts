@@ -1,6 +1,7 @@
 import { JwtService } from "@nestjs/jwt";
 import { Constants } from "../constants.class";
 import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { JwtPayload, jwtDecode } from "jwt-decode";
 
 @Injectable()
 export class AuthTokenService {
@@ -10,6 +11,10 @@ export class AuthTokenService {
 
     async sign(payload, expire: string) {
         return await this.jwtService.signAsync(payload, { secret: Constants.JWT_SECRET, expiresIn: expire })
+    }
+
+    decode(token: string): JwtPayload {
+        return jwtDecode<JwtPayload>(token);
     }
 
     async verify(token: string) {
@@ -24,10 +29,10 @@ export class AuthTokenService {
                     secret: Constants.JWT_SECRET
                 }
             );
+            return true;
         } catch {
             throw new UnauthorizedException();
         }
-        return true;
     }
 
     addToBlackList(token: string): void {

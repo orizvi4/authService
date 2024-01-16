@@ -67,7 +67,7 @@ export class ActiveDirectoryController {
     return (await this.activeDirectoryService.modifyUser(body))
   }
 
-  @UseGuards(ManagerGuard)
+  @UseGuards(AuthGuard)
   @Get('/groups/user')
   async getUserGroup(@Query("username") username: string): Promise<string> {
     return await this.activeDirectoryService.getUserGroup(username);

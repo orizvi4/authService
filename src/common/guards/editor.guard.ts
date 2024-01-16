@@ -13,7 +13,7 @@ export class EditorGuard implements CanActivate {
         const token: string = this.extractTokenFromHeader(request);
         if (token) {
             if (await this.authTokenService.verify(token) &&
-                JSON.parse(this.decode(token)).group == "editors") {
+                (JSON.parse(this.decode(token)).group == "editors" || JSON.parse(this.decode(token)).group == "managers")) {
                 return true;
             }
         }

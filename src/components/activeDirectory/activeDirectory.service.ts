@@ -122,10 +122,9 @@ export class ActiveDirectoryService {
 
     private async memberOf(username: string, group: string): Promise<boolean> {
         let user = `${username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`;
-        let groupName = `${group}`;
         try {
             const res: boolean = await new Promise((resolve, reject) => {
-                this.activeDirectory.isUserMemberOf(user, groupName, (err, isMember) => {
+                this.activeDirectory.isUserMemberOf(user, group, (err, isMember) => {
                     if (err) {
                         return reject(err);
                     }
@@ -136,6 +135,7 @@ export class ActiveDirectoryService {
 
         }
         catch (err) {
+            console.log(err);
             LoggerService.logError(err.message, 'active directory');
             throw new InternalServerErrorException();
         }

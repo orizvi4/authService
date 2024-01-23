@@ -8,10 +8,11 @@ import { AuthGuard } from 'src/common/guards/auth.guard';
 import { AuthTokenService } from 'src/common/services/AuthToken.service';
 import { EditorGuard } from 'src/common/guards/editor.guard';
 import { ManagerGuard } from 'src/common/guards/manager.guard';
+import { CommonModule } from 'src/common/common.module';
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), CommonModule],
   controllers: [ActiveDirectoryController],
-  providers: [ActiveDirectoryService, LoggerService, AuthTokenService],
+  providers: [ActiveDirectoryService],
 })
 export class ActiveDirectoryModule {}

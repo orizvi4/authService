@@ -1,16 +1,21 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { Constants } from 'src/common/constants.class';
-import { UserDTO } from 'src/common/models/user.dto';
+import { UserDTO } from 'src/components/activeDirectory/models/user.dto';
 import { AuthTokenService } from 'src/common/services/AuthToken.service';
 import { LoggerService } from 'src/common/services/logger.service';
-// import * as Ad from 'activedirectory/lib/models';
+import { UserStrike } from '../userStrike/models/userStrike.model';
+import { strike } from 'src/common/strike.enums';
+import { UserStrikeService } from '../userStrike/userStrike.service';
 
 const ActiveDirectory = require('activedirectory');
 const ldap = require('ldapjs');
 
 @Injectable()
 export class ActiveDirectoryService {
-    constructor(private loggerService: LoggerService, private authTokenService: AuthTokenService) {
+    constructor(
+        private loggerService: LoggerService,
+        private authTokenService: AuthTokenService,
+        private userStrikeService: UserStrikeService) {
         this.createLDAPClient();
     }
     config = {
@@ -23,11 +28,6 @@ export class ActiveDirectoryService {
     groups: string[] = ['editors', 'managers'];
     client;
 
-
-    async refreshToken(username: string) {
-        const payload = { username: username, group: await this.getUserGroup(username) };
-        return await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
-    }
 
     async addToBlackList(accessToken: string, refreshToken: string) {
         this.authTokenService.addToBlackList(accessToken);
@@ -163,6 +163,11 @@ export class ActiveDirectoryService {
             await this.clientBind();
             const currentDN = `cn=${oldUser.username},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`;
             const newDN = `cn=${newUser.username},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`;
+
+            if (Constants.INVALID_TEXT.test(newUser.username) || Constants.INVALID_TEXT.test(newUser.sn)) {
+                throw new ForbiddenException();
+            }
+
             const change = {
                 operation: 'replace',
                 modification: {
@@ -201,8 +206,13 @@ export class ActiveDirectoryService {
             });
         }
         catch (err) {
+            console.log(err);
             if (err == 'error') {
                 throw new InternalServerErrorException();
+            }
+            else if (err.response != null && err.response.statusCode == 403) {
+                // this.userStrikeService.strike(user.username, strike.INVALID_INPUT); get the sender name
+                throw err;
             }
             else {
                 LoggerService.logError(err.message, 'ldapjs');
@@ -214,6 +224,9 @@ export class ActiveDirectoryService {
     async createUser(body: UserDTO): Promise<string> {
         let user: UserDTO;
         try {
+            if (Constants.INVALID_TEXT.test(body.username) || Constants.INVALID_TEXT.test(body.sn)) {
+                throw new ForbiddenException();
+            }
             user = await new Promise((resolve, reject) => {
                 this.activeDirectory.findUser(body.username, (err, user) => {
                     if (err) {
@@ -225,6 +238,10 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             LoggerService.logError(err.message, 'active directory');
+            if (err.response != null && err.response.statusCode == 403) {
+                // this.userStrikeService.strike(user.username, strike.INVALID_INPUT); get the sender name
+                throw err;
+            }
             throw new InternalServerErrorException();
         }
         try {
@@ -266,13 +283,13 @@ export class ActiveDirectoryService {
                 }
             }
             else {
-                throw new ForbiddenException();
+                throw new BadRequestException();
             }
         }
         catch (err) {
             LoggerService.logError(err.message, 'ldapjs');
-            if (err.status == 403) {
-                throw new ForbiddenException();
+            if (err.status == 400) {
+                throw new BadRequestException();
             }
             throw new InternalServerErrorException();
         }

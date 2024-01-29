@@ -6,6 +6,7 @@ import { EditorGuard } from "src/common/guards/editor.guard";
 import { ManagerGuard } from "src/common/guards/manager.guard";
 import { strike } from "src/common/strike.enums";
 import { UserStrikeDTO } from "./models/userStrike.dto";
+import { SkipThrottle } from "@nestjs/throttler";
 
 @Controller()
 export class UserStrikeController {
@@ -13,27 +14,31 @@ export class UserStrikeController {
 
   @Post("/strike/localStorage")
   public localStorageStrike(@Body() body: UserStrikeDTO) {
-    this.userStrikeService.strike(body.userName, strike.LOCAL_STORAGE);
+    this.userStrikeService.strike(body.username, strike.LOCAL_STORAGE);
   }
 
+  @SkipThrottle()
   @UseGuards(AuthGuard)
   @Post('/tokens/refresh')
   public async refreshToken(@Body() body): Promise<string> {
     return await this.userStrikeService.refreshToken(body.token);
   }
 
+  @SkipThrottle()
   @UseGuards(AuthGuard)
   @Get('/tokens/verify')
   public tokenVerify(): boolean {
     return true;
   }
 
+  @SkipThrottle()
   @UseGuards(ManagerGuard)
   @Get('/tokens/verify/manager')
   public managerVerify(): boolean {
     return true;
   }
 
+  @SkipThrottle()
   @UseGuards(EditorGuard)
   @Get('/tokens/verify/editor')
   public editorVerify(): boolean {

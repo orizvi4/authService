@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Constants } from "src/common/constants.class";
+import { CustomJwtPayload } from "src/common/models/customJwtPayload.class";
 import { AuthTokenService } from "src/common/services/AuthToken.service";
 import { StrikeService } from "src/common/services/strike.service";
 import { strike } from "src/common/strike.enums";
@@ -9,7 +10,7 @@ export class UserStrikeService {
     constructor(private authTokenService: AuthTokenService, private strikeService: StrikeService) { }
 
     public async refreshToken(token: string) {
-        const decodeToken = this.authTokenService.decode(token);
+        const decodeToken: CustomJwtPayload = this.authTokenService.decode(token);
         const payload = { username: decodeToken.username, group: decodeToken.group };
         return await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
     }

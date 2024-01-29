@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Put, Query, Headers, UseGuards, UseFilters } from '@nestjs/common';
 import { ActiveDirectoryService } from './activeDirectory.service';
 import { UserDTO } from 'src/components/activeDirectory/models/user.dto';
 import { AuthGuard } from 'src/common/guards/auth.guard';
 import { EditorGuard } from 'src/common/guards/editor.guard';
 import { ManagerGuard } from 'src/common/guards/manager.guard';
+import { Throttle } from '@nestjs/throttler';
+import { ThrottlerExceptionFilter } from 'src/common/filters/throttlerException.filter';
 
 @Controller()
 export class ActiveDirectoryController {
@@ -27,8 +29,8 @@ export class ActiveDirectoryController {
 
   @UseGuards(ManagerGuard)
   @Post("/users/add")
-  async addUser(@Body() body: UserDTO) {
-    return await this.activeDirectoryService.createUser(body);
+  async addUser(@Body() body: UserDTO, @Headers("username") clientUsername) {
+    return await this.activeDirectoryService.createUser(body, clientUsername);
   }
 
   @UseGuards(ManagerGuard)
@@ -39,13 +41,14 @@ export class ActiveDirectoryController {
 
   @UseGuards(ManagerGuard)
   @Put("/users/modify")
-  async modifyUser(@Body() body: UserDTO[]): Promise<string> {
-    return (await this.activeDirectoryService.modifyUser(body))//get username from jwt
+  async modifyUser(@Body() body: UserDTO[], @Headers("username") clientUsername: string): Promise<string> {
+    return (await this.activeDirectoryService.modifyUser(body, clientUsername))
   }
 
   @UseGuards(AuthGuard)
+  @UseFilters(ThrottlerExceptionFilter)
   @Get('/groups/user')
-  async getUserGroup(@Query("username") username: string): Promise<string> {
+  async getUserGroup(@Query("username") username: string, @Headers("username") clientUsername: string): Promise<string> {
     return await this.activeDirectoryService.getUserGroup(username);
   }
 }

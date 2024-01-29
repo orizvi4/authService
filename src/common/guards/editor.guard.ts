@@ -3,6 +3,7 @@ import { JwtService } from "@nestjs/jwt";
 import { Constants } from "../constants.class";
 import { Request } from 'express';
 import { AuthTokenService } from "../services/AuthToken.service";
+import { strike } from "../strike.enums";
 
 @Injectable()
 export class EditorGuard implements CanActivate {
@@ -12,7 +13,8 @@ export class EditorGuard implements CanActivate {
         const request = context.switchToHttp().getRequest();
         const token: string = this.extractTokenFromHeader(request);
         if (token) {
-            if (await this.authTokenService.verify(token) &&
+            request.headers["username"] = this.authTokenService.decode(token).username;
+            if (await this.authTokenService.verify(token, strike.EDITOR_REQUEST) &&
                 (JSON.parse(this.decode(token)).group == "editors" || JSON.parse(this.decode(token)).group == "managers")) {
                 return true;
             }

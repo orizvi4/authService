@@ -1,4 +1,4 @@
 export interface UserStrikeDTO {
-    userName: string;
+    username: string;
     strike: number;
 }

@@ -3,10 +3,15 @@ import { Constants } from "../constants.class";
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtPayload, jwtDecode } from "jwt-decode";
 import { CustomJwtPayload } from "../models/customJwtPayload.class";
+import { StrikeService } from "./strike.service";
+import { strike } from "../strike.enums";
 
 @Injectable()
 export class AuthTokenService {
-    constructor(private jwtService: JwtService) { }
+    constructor(
+        private jwtService: JwtService,
+        private strikeService: StrikeService
+    ) { }
 
     private blackList: Set<string> = new Set();
 
@@ -18,8 +23,10 @@ export class AuthTokenService {
         return jwtDecode(token);
     }
 
-    async verify(token: string) {
+    async verify(token: string, strikeRequest: strike) {
         if (this.blackList.has(token)) {
+            const decodedToken :CustomJwtPayload = this.decode(token);
+            this.strikeService.strike(decodedToken.username, strikeRequest);
             throw new UnauthorizedException();
         }
 
@@ -32,6 +39,8 @@ export class AuthTokenService {
             );
             return true;
         } catch {
+            const decodedToken :CustomJwtPayload = this.decode(token);
+            this.strikeService.strike(decodedToken.username, strikeRequest);
             throw new UnauthorizedException();
         }
     }

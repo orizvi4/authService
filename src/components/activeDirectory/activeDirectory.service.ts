@@ -3,9 +3,8 @@ import { Constants } from 'src/common/constants.class';
 import { UserDTO } from 'src/components/activeDirectory/models/user.dto';
 import { AuthTokenService } from 'src/common/services/AuthToken.service';
 import { LoggerService } from 'src/common/services/logger.service';
-import { UserStrike } from '../userStrike/models/userStrike.model';
+import { StrikeService } from 'src/common/services/strike.service';
 import { strike } from 'src/common/strike.enums';
-import { UserStrikeService } from '../userStrike/userStrike.service';
 
 const ActiveDirectory = require('activedirectory');
 const ldap = require('ldapjs');
@@ -15,7 +14,7 @@ export class ActiveDirectoryService {
     constructor(
         private loggerService: LoggerService,
         private authTokenService: AuthTokenService,
-        private userStrikeService: UserStrikeService) {
+        private strikeService: StrikeService) {
         this.createLDAPClient();
     }
     config = {
@@ -92,7 +91,7 @@ export class ActiveDirectoryService {
                 });
             });
             const group = await this.getUserGroup(body.username);
-            const payload = { username: user.username, group: group };
+            const payload = { username: body.username, group: group };
             const accessToken = await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
             const refreshToken = await this.authTokenService.sign(payload, Constants.REFRESH_TOKEN_EXPIRE);
             return { ...user, group: group, accessToken: accessToken, refreshToken: refreshToken }
@@ -156,7 +155,7 @@ export class ActiveDirectoryService {
         })
     }
 
-    async modifyUser(body: UserDTO[]) {
+    async modifyUser(body: UserDTO[], clientUsername: string) {
         const oldUser: UserDTO = body[0];
         const newUser: UserDTO = body[1];
         try {
@@ -211,7 +210,7 @@ export class ActiveDirectoryService {
                 throw new InternalServerErrorException();
             }
             else if (err.response != null && err.response.statusCode == 403) {
-                // this.userStrikeService.strike(user.username, strike.INVALID_INPUT); get the sender name
+                this.strikeService.strike(clientUsername, strike.INVALID_INPUT);
                 throw err;
             }
             else {
@@ -221,7 +220,7 @@ export class ActiveDirectoryService {
         }
     }
 
-    async createUser(body: UserDTO): Promise<string> {
+    async createUser(body: UserDTO, clientUsername): Promise<string> {
         let user: UserDTO;
         try {
             if (Constants.INVALID_TEXT.test(body.username) || Constants.INVALID_TEXT.test(body.sn)) {
@@ -239,7 +238,7 @@ export class ActiveDirectoryService {
         catch (err) {
             LoggerService.logError(err.message, 'active directory');
             if (err.response != null && err.response.statusCode == 403) {
-                // this.userStrikeService.strike(user.username, strike.INVALID_INPUT); get the sender name
+                this.strikeService.strike(clientUsername, strike.INVALID_INPUT);
                 throw err;
             }
             throw new InternalServerErrorException();

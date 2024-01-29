@@ -15,7 +15,9 @@ export class UserStrikeService {
         return await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
     }
 
-    public async strike(username: string, strike: strike) {
+    public async strike(token: string, strike: strike) {
+        const username: string = this.authTokenService.decode(token).username;
+        console.log(username);
         this.strikeService.strike(username, strike);
     }
 

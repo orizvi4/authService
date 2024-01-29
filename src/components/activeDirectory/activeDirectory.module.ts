@@ -9,8 +9,8 @@ import { ThrottlerExceptionFilter } from 'src/common/filters/throttlerException.
 @Module({
   imports: [CommonModule,
     ThrottlerModule.forRoot([{
-      ttl: 8000,
-      limit: 3,//10
+      ttl: 1000,
+      limit: 12,
     }])],
   controllers: [ActiveDirectoryController],
   providers: [ActiveDirectoryService, {

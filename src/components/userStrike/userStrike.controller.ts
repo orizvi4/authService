@@ -14,8 +14,14 @@ export class UserStrikeController {
 
   @SkipThrottle()
   @Post("/strike/localStorage")
-  public localStorageStrike(@Body() body: UserStrikeDTO) {
-    this.userStrikeService.strike(body.username, strike.LOCAL_STORAGE);
+  public localStorageStrike(@Body() body) {
+    this.userStrikeService.strike(body.token, strike.LOCAL_STORAGE);
+  }
+
+  @SkipThrottle()
+  @Post("/strike/dos")
+  public dosStrike(@Body() body) {
+    this.userStrikeService.strike(body.token, strike.DOS);
   }
 
   @SkipThrottle()

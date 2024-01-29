@@ -4,7 +4,7 @@ import { UserDTO } from 'src/components/activeDirectory/models/user.dto';
 import { AuthGuard } from 'src/common/guards/auth.guard';
 import { EditorGuard } from 'src/common/guards/editor.guard';
 import { ManagerGuard } from 'src/common/guards/manager.guard';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ThrottlerExceptionFilter } from 'src/common/filters/throttlerException.filter';
 
 @Controller()

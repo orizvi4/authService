@@ -3,7 +3,8 @@ import { ActiveDirectoryController } from './activeDirectory.controller';
 import { ActiveDirectoryService } from './activeDirectory.service';
 import { CommonModule } from 'src/common/common.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ThrottlerExceptionFilter } from 'src/common/filters/throttlerException.filter';
 
 @Module({
   imports: [CommonModule,
@@ -15,6 +16,9 @@ import { APP_GUARD } from '@nestjs/core';
   providers: [ActiveDirectoryService, {
     provide: APP_GUARD,
     useClass: ThrottlerGuard
-  }],
+  }, {
+    provide: APP_FILTER,
+    useClass: ThrottlerExceptionFilter,
+  },],
 })
 export class ActiveDirectoryModule { }

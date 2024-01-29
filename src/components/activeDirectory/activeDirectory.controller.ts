@@ -46,7 +46,6 @@ export class ActiveDirectoryController {
   }
 
   @UseGuards(AuthGuard)
-  @UseFilters(ThrottlerExceptionFilter)
   @Get('/groups/user')
   async getUserGroup(@Query("username") username: string, @Headers("username") clientUsername: string): Promise<string> {
     return await this.activeDirectoryService.getUserGroup(username);

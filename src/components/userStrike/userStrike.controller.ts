@@ -12,6 +12,7 @@ import { SkipThrottle } from "@nestjs/throttler";
 export class UserStrikeController {
   constructor(private readonly userStrikeService: UserStrikeService) { }
 
+  @SkipThrottle()
   @Post("/strike/localStorage")
   public localStorageStrike(@Body() body: UserStrikeDTO) {
     this.userStrikeService.strike(body.username, strike.LOCAL_STORAGE);

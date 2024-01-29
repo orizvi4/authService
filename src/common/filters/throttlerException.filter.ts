@@ -15,6 +15,7 @@ export class ThrottlerExceptionFilter implements ExceptionFilter {
         const status = exception.getStatus();
 
         const username: string = this.authTokenService.decode(request.headers.authorization.split(' ')[1]).username;
+        console.log(username);
         this.strikeService.strike(username, strike.DOS);
 
         response.status(status).json({

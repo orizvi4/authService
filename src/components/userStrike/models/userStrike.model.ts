@@ -4,10 +4,13 @@ import { Document } from "mongoose";
 @Schema()
 export class UserStrike extends Document {
   @Prop()
-  userName: string;
+  username: string;
 
   @Prop()
   strike: number;
+
+  @Prop()
+  actions: string[];
 }
 
 export const UserStrikeSchema = SchemaFactory.createForClass(UserStrike);

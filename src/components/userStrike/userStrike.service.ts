@@ -17,7 +17,6 @@ export class UserStrikeService {
 
     public async strike(token: string, strike: strike) {
         const username: string = this.authTokenService.decode(token).username;
-        console.log(username);
         this.strikeService.strike(username, strike);
     }
 

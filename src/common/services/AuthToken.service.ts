@@ -20,7 +20,12 @@ export class AuthTokenService {
     }
 
     decode(token: string): CustomJwtPayload {
-        return jwtDecode(token);
+        try {
+            return jwtDecode(token);
+        }
+        catch (err) {
+            return undefined;
+        }
     }
 
     async verify(token: string, strikeRequest: strike) {

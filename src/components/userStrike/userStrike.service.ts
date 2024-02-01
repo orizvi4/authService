@@ -2,8 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { Constants } from "src/common/constants.class";
 import { CustomJwtPayload } from "src/common/models/customJwtPayload.class";
 import { AuthTokenService } from "src/common/services/AuthToken.service";
+import { LoggerService } from "src/common/services/logger.service";
 import { StrikeService } from "src/common/services/strike.service";
-import { strike } from "src/common/strike.enums";
+import { strike } from "src/common/enums/strike.enums";
 
 @Injectable()
 export class UserStrikeService {
@@ -15,9 +16,14 @@ export class UserStrikeService {
         return await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
     }
 
-    public async strike(token: string, strike: strike) {
-        const username: string = this.authTokenService.decode(token).username;
-        this.strikeService.strike(username, strike);
+    public async strike(token: string, strike: strike): Promise<void> {
+        try {
+            const username: string = this.authTokenService.decode(token).username;
+            await this.strikeService.strike(username, strike);
+        }
+        catch (err) {
+            LoggerService.logError("unauthorized token", 'code');
+        }
     }
 
 }

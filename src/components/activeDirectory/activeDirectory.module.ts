@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ActiveDirectoryController } from './activeDirectory.controller';
 import { ActiveDirectoryService } from './activeDirectory.service';
 import { CommonModule } from 'src/common/common.module';
@@ -7,7 +7,7 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerExceptionFilter } from 'src/common/filters/throttlerException.filter';
 
 @Module({
-  imports: [CommonModule,
+  imports: [forwardRef(() => CommonModule),
     ThrottlerModule.forRoot([{
       ttl: 1000,
       limit: 12,
@@ -20,5 +20,6 @@ import { ThrottlerExceptionFilter } from 'src/common/filters/throttlerException.
     provide: APP_FILTER,
     useClass: ThrottlerExceptionFilter,
   },],
+  exports: [ActiveDirectoryService]
 })
 export class ActiveDirectoryModule { }

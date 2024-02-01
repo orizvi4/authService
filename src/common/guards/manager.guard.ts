@@ -3,7 +3,7 @@ import { JwtService } from "@nestjs/jwt";
 import { Constants } from "../constants.class";
 import { Request } from 'express';
 import { AuthTokenService } from "../services/AuthToken.service";
-import { strike } from "../strike.enums";
+import { strike } from "../enums/strike.enums";
 
 @Injectable()
 export class ManagerGuard implements CanActivate {

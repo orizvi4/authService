@@ -4,7 +4,7 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtPayload, jwtDecode } from "jwt-decode";
 import { CustomJwtPayload } from "../models/customJwtPayload.class";
 import { StrikeService } from "./strike.service";
-import { strike } from "../strike.enums";
+import { strike } from "../enums/strike.enums";
 
 @Injectable()
 export class AuthTokenService {
@@ -24,6 +24,7 @@ export class AuthTokenService {
             return jwtDecode(token);
         }
         catch (err) {
+            console.log(err);
             return undefined;
         }
     }
@@ -31,7 +32,7 @@ export class AuthTokenService {
     async verify(token: string, strikeRequest: strike) {
         if (this.blackList.has(token)) {
             const decodedToken :CustomJwtPayload = this.decode(token);
-            this.strikeService.strike(decodedToken.username, strikeRequest);
+            await this.strikeService.strike(decodedToken.username, strikeRequest);
             throw new UnauthorizedException();
         }
 
@@ -45,7 +46,7 @@ export class AuthTokenService {
             return true;
         } catch {
             const decodedToken :CustomJwtPayload = this.decode(token);
-            this.strikeService.strike(decodedToken.username, strikeRequest);
+            await this.strikeService.strike(decodedToken.username, strikeRequest);
             throw new UnauthorizedException();
         }
     }

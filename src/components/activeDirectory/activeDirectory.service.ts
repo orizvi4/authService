@@ -1,10 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, InternalServerErrorException, UnauthorizedException, forwardRef } from '@nestjs/common';
 import { Constants } from 'src/common/constants.class';
 import { UserDTO } from 'src/components/activeDirectory/models/user.dto';
 import { AuthTokenService } from 'src/common/services/AuthToken.service';
 import { LoggerService } from 'src/common/services/logger.service';
 import { StrikeService } from 'src/common/services/strike.service';
-import { strike } from 'src/common/strike.enums';
+import { strike } from 'src/common/enums/strike.enums';
+import {group} from 'src/common/enums/group.enums';
 
 const ActiveDirectory = require('activedirectory');
 const ldap = require('ldapjs');
@@ -13,18 +14,18 @@ const ldap = require('ldapjs');
 export class ActiveDirectoryService {
     constructor(
         private loggerService: LoggerService,
-        private authTokenService: AuthTokenService,
-        private strikeService: StrikeService) {
+        @Inject(forwardRef(() => AuthTokenService)) private authTokenService: AuthTokenService,
+        @Inject(forwardRef(() => StrikeService)) private strikeService: StrikeService) {
         this.createLDAPClient();
     }
     config = {
         url: `ldap://${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
         baseDN: `dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`,
         username: `${Constants.ADMIN_USER}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
-        password: Constants.ADMIN_PASWORD
+        password: Constants.ADMIN_PASSWORD
     };
     activeDirectory = new ActiveDirectory(this.config);
-    groups: string[] = ['editors', 'managers'];
+    groups: group[] = [group.EDITORS, group.MANAGERS];
     client;
 
 
@@ -34,12 +35,14 @@ export class ActiveDirectoryService {
     }
 
     async createLDAPClient(reconnect: boolean = false) {
-        this.client = await ldap.createClient({
-            url: `ldaps://${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}:636`,
-            tlsOptions: {
-                rejectUnauthorized: false
-            }
-        });
+        if (this.client == undefined) {
+            this.client = await ldap.createClient({
+                url: `ldaps://${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}:636`,
+                tlsOptions: {
+                    rejectUnauthorized: false
+                }
+            });
+        }
 
         this.client.on('error', async (err) => {
             if (!reconnect) {
@@ -71,6 +74,9 @@ export class ActiveDirectoryService {
         const password: string = body.password;
 
         try {
+            if (await this.strikeService.isBlocked(body.username)) {
+                throw new UnauthorizedException();
+            }
             await new Promise((resolve, reject) => {
                 this.activeDirectory.authenticate(username, password, (err, auth) => {
                     if (err) {
@@ -81,6 +87,7 @@ export class ActiveDirectoryService {
             });
 
             LoggerService.logInfo('user: ' + username + ' authanticated successfully');
+            await this.strikeService.resetLoginAttempt(body.username);
 
             let user: UserDTO = await new Promise((resolve, reject) => {
                 this.activeDirectory.findUser(username, (err, user) => {
@@ -90,40 +97,41 @@ export class ActiveDirectoryService {
                     resolve(user);
                 });
             });
-            const group = await this.getUserGroup(body.username);
-            const payload = { username: body.username, group: group };
+            const tempGroup = await this.getUserGroup(body.username);
+            const payload = { username: body.username, group: tempGroup };
             const accessToken = await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
             const refreshToken = await this.authTokenService.sign(payload, Constants.REFRESH_TOKEN_EXPIRE);
-            return { ...user, group: group, accessToken: accessToken, refreshToken: refreshToken }
+            return { ...user, group: tempGroup, accessToken: accessToken, refreshToken: refreshToken }
         }
         catch (err) {
             LoggerService.logError(err.message, 'active directory');
             if (err.errno == -3008) {
                 throw new InternalServerErrorException();
             }
+            await this.strikeService.addLoginAttempt(body.username);
             throw new UnauthorizedException();
         }
     }
-    async getUserGroup(username: string): Promise<string> {
-        for (const group of this.groups) {
+    async getUserGroup(username: string): Promise<group> {
+        for (const tempGroup of this.groups) {
             try {
-                const res: boolean = await this.memberOf(username, group);
+                const res: boolean = await this.memberOf(username, tempGroup);
                 if (res == true) {
-                    return group;
+                    return tempGroup;
                 }
             }
             catch (err) {
                 throw err;
             }
         }
-        return 'users';
+        return group.USERS;
     }
 
-    private async memberOf(username: string, group: string): Promise<boolean> {
+    private async memberOf(username: string, tempGroup: group): Promise<boolean> {
         let user = `${username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`;
         try {
             const res: boolean = await new Promise((resolve, reject) => {
-                this.activeDirectory.isUserMemberOf(user, group, (err, isMember) => {
+                this.activeDirectory.isUserMemberOf(user, tempGroup, (err, isMember) => {
                     if (err) {
                         return reject(err);
                     }
@@ -141,8 +149,9 @@ export class ActiveDirectoryService {
     }
 
     async clientBind() {
+        await this.createLDAPClient();
         const bind = await new Promise(async (resolve, reject) => {
-            await this.client.bind(`cn=${Constants.ADMIN_USER},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, Constants.ADMIN_PASWORD, (err) => {
+            await this.client.bind(`cn=${Constants.ADMIN_USER},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, Constants.ADMIN_PASSWORD, (err) => {
                 if (err) {
                     LoggerService.logError(err.message, 'ldapjs');
                     reject("error");
@@ -155,7 +164,38 @@ export class ActiveDirectoryService {
         })
     }
 
-    async modifyUser(body: UserDTO[], clientUsername: string) {
+    public async limitUser(username: string): Promise<void> {
+        await this.updateGroupOfUser(username, group.USERS);
+    }
+
+    public async blockUser(username: string): Promise<void> {
+        const DN = `cn=${username},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`;
+        try {
+            await this.clientBind();
+
+            const change = {
+                operation: 'replace',
+                modification: {
+                    userAccountControl: 514,
+                }
+            };
+            await new Promise((resolve, reject) => {
+                this.client.modify(DN, change, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+                    resolve('success');
+                });
+            });
+        }
+        catch (err) {
+            console.log(err);
+            LoggerService.logError(err.message, 'ldapjs');
+            throw new BadRequestException();
+        }
+    }
+
+    public async modifyUser(body: UserDTO[], clientUsername: string): Promise<string> {
         const oldUser: UserDTO = body[0];
         const newUser: UserDTO = body[1];
         try {
@@ -186,9 +226,10 @@ export class ActiveDirectoryService {
                     });
                     resolve('success');
                 });
+                await this.strikeService.changeUsername(oldUser.username, newUser.username);
             }
             await new Promise((resolve, reject) => {
-                this.client.modify(currentDN, change, (err) => {
+                this.client.modify(newDN, change, (err) => {
                     if (err) {
                         return reject(err);
                     }
@@ -210,7 +251,7 @@ export class ActiveDirectoryService {
                 throw new InternalServerErrorException();
             }
             else if (err.response != null && err.response.statusCode == 403) {
-                this.strikeService.strike(clientUsername, strike.INVALID_INPUT);
+                await this.strikeService.strike(clientUsername, strike.INVALID_INPUT);
                 throw err;
             }
             else {
@@ -238,7 +279,7 @@ export class ActiveDirectoryService {
         catch (err) {
             LoggerService.logError(err.message, 'active directory');
             if (err.response != null && err.response.statusCode == 403) {
-                this.strikeService.strike(clientUsername, strike.INVALID_INPUT);
+                await this.strikeService.strike(clientUsername, strike.INVALID_INPUT);
                 throw err;
             }
             throw new InternalServerErrorException();
@@ -267,7 +308,7 @@ export class ActiveDirectoryService {
                     resolve("success");
                 });
                 if (res == "success") {
-                    if (body.group != 'users') {
+                    if (body.group != group.USERS) {
                         await this.addToGroup(body.username, body.group);
                     }
                     const now: string[] = ((new Date()).toLocaleDateString()).split('/');
@@ -280,6 +321,7 @@ export class ActiveDirectoryService {
                         group: body.group
                     });
                 }
+                await this.strikeService.userHandle(body.username);
             }
             else {
                 throw new BadRequestException();
@@ -313,7 +355,7 @@ export class ActiveDirectoryService {
         }
     }
 
-    private async addToGroup(name: string, group: string): Promise<string> {
+    private async addToGroup(name: string, tempGroup: group): Promise<string> {
         try {
             const change = {
                 operation: 'add',
@@ -321,7 +363,7 @@ export class ActiveDirectoryService {
                     member: `cn=${name},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`
                 }
             };
-            if (group == 'managers') {
+            if (tempGroup == group.MANAGERS) {
                 await new Promise((resolve, reject) => {
                     this.client.modify(`cn=Domain Admins,cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, change, (err) => {
                         if (err) {
@@ -333,7 +375,7 @@ export class ActiveDirectoryService {
                 });
             }
             return await new Promise((resolve, reject) => {
-                this.client.modify(`cn=${group},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, change, (err) => {
+                this.client.modify(`cn=${tempGroup},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, change, (err) => {
                     if (err) {
                         return reject(err);
                     }
@@ -348,20 +390,20 @@ export class ActiveDirectoryService {
         }
     }
 
-    private async updateGroupOfUser(name: string, newGroup: string) {
+    private async updateGroupOfUser(name: string, newGroup: group): Promise<void> {
         try {
-            for (const group of this.groups) {
-                if (newGroup != 'users') {
-                    if (group != newGroup && await this.memberOf(name, group)) {
-                        await this.deleteFromGroup(name, group);
+            for (const tempGroup of this.groups) {
+                if (newGroup != group.USERS) {
+                    if (tempGroup != newGroup && await this.memberOf(name, tempGroup)) {
+                        await this.deleteFromGroup(name, tempGroup);
                     }
-                    else if (group == newGroup && !(await this.memberOf(name, group))) {
-                        await this.addToGroup(name, group);
+                    else if (tempGroup == newGroup && !(await this.memberOf(name, tempGroup))) {
+                        await this.addToGroup(name, tempGroup);
                     }
                 }
                 else {
-                    if (await this.memberOf(name, group)) {
-                        await this.deleteFromGroup(name, group);
+                    if (await this.memberOf(name, tempGroup)) {
+                        await this.deleteFromGroup(name, tempGroup);
                     }
                 }
             }
@@ -371,7 +413,7 @@ export class ActiveDirectoryService {
         }
     }
 
-    private async deleteFromGroup(name: string, group: string): Promise<string> {
+    private async deleteFromGroup(name: string, tempGroup: group): Promise<string> {
         try {
             await this.clientBind();
             const change = {
@@ -379,9 +421,8 @@ export class ActiveDirectoryService {
                 modification: {
                     member: `cn=${name},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`
                 }
-
             };
-            if (group == 'managers') {
+            if (tempGroup == group.MANAGERS) {
                 await new Promise((resolve, reject) => {
                     this.client.modify(`cn=Domain Admins,cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, change, (err) => {
                         if (err) {
@@ -394,11 +435,11 @@ export class ActiveDirectoryService {
             }
 
             return await new Promise((resolve, reject) => {
-                this.client.modify(`cn=${group},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, change, (err) => {
+                this.client.modify(`cn=${tempGroup},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, change, (err) => {
                     if (err) {
                         return reject(err);
                     }
-                    LoggerService.logInfo('user: ' + name + ' has been deleted from group: ' + group);
+                    LoggerService.logInfo('user: ' + name + ' has been deleted from group: ' + tempGroup);
                     resolve("success");
                 });
             });

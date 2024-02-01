@@ -5,7 +5,7 @@ export enum strike {
     EDITOR_REQUEST = "editor request",//done
     REQUEST = "request",//done
     DOS = "dos",//done
-    LOGIN_EXEEDED = "login exeeded",
+    LOGIN_EXEEDED = "login exeeded",//done
     LOCAL_STORAGE = "local storage",//done
     INVALID_INPUT = "invalid input"//done except mail and phone (remove @ and . as unauthorized somethime)
 }

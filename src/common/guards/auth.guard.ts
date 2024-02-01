@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { Request } from 'express';
 import { AuthTokenService } from "../services/AuthToken.service";
 import { StrikeService } from "../services/strike.service";
-import { strike } from "../strike.enums";
+import { strike } from "../enums/strike.enums";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -12,7 +12,7 @@ export class AuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const token: string = this.extractTokenFromHeader(request);
     if (!token) {
-      // this.strikeService.strike();
+      // this.strikeService.strike(); check how to implement if
       throw new UnauthorizedException();
     }
     request.headers["username"] = this.authTokenService.decode(token).username;

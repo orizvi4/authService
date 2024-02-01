@@ -4,8 +4,8 @@ import { UserStrikeService } from "./userStrike.service";
 import { AuthGuard } from "src/common/guards/auth.guard";
 import { EditorGuard } from "src/common/guards/editor.guard";
 import { ManagerGuard } from "src/common/guards/manager.guard";
-import { strike } from "src/common/strike.enums";
-import { UserStrikeDTO } from "./models/userStrike.dto";
+import { strike } from "src/common/enums/strike.enums";
+import { UserStrikeDTO } from "../../common/models/userStrike.dto";
 import { SkipThrottle } from "@nestjs/throttler";
 
 @Controller()

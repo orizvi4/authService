@@ -24,14 +24,14 @@ export class AuthTokenService {
             return jwtDecode(token);
         }
         catch (err) {
-            console.log(err);
-            return undefined;
+            console.log(err.message);
+            return { username: null };
         }
     }
 
     async verify(token: string, strikeRequest: strike) {
         if (this.blackList.has(token)) {
-            const decodedToken :CustomJwtPayload = this.decode(token);
+            const decodedToken: CustomJwtPayload = this.decode(token);
             await this.strikeService.strike(decodedToken.username, strikeRequest);
             throw new UnauthorizedException();
         }
@@ -45,7 +45,7 @@ export class AuthTokenService {
             );
             return true;
         } catch {
-            const decodedToken :CustomJwtPayload = this.decode(token);
+            const decodedToken: CustomJwtPayload = this.decode(token);
             await this.strikeService.strike(decodedToken.username, strikeRequest);
             throw new UnauthorizedException();
         }

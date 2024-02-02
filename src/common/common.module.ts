@@ -7,10 +7,11 @@ import { JwtModule } from "@nestjs/jwt";
 import { MongooseModule } from "@nestjs/mongoose";
 import { UserStrike, UserStrikeSchema } from "src/common/models/userStrike.model";
 import { ActiveDirectoryModule } from "src/components/activeDirectory/activeDirectory.module";
+import { WebsocketService } from "./services/websocket.service";
 
 @Module({
     imports: [JwtModule, MongooseModule.forFeature([{ name: UserStrike.name, schema: UserStrikeSchema }]), forwardRef(() => ActiveDirectoryModule)],
-    providers: [StrikeService, LoggerService, AuthTokenService],
-    exports: [StrikeService, LoggerService, AuthTokenService]
+    providers: [StrikeService, LoggerService, AuthTokenService, WebsocketService],
+    exports: [StrikeService, LoggerService, AuthTokenService, WebsocketService]
   })
   export class CommonModule {}

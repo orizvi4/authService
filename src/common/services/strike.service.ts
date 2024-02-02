@@ -5,12 +5,14 @@ import { Model } from "mongoose";
 import { UserStrikeDTO } from "src/common/models/userStrike.dto";
 import { ActiveDirectoryService } from "src/components/activeDirectory/activeDirectory.service";
 import { Inject, forwardRef } from "@nestjs/common";
+import { WebsocketService } from "./websocket.service";
 
 export class StrikeService {
 
     constructor(
         @InjectModel(UserStrike.name) private readonly userStrikeModel: Model<UserStrike>,
-        @Inject(forwardRef(() => ActiveDirectoryService)) private activeDirectoryService: ActiveDirectoryService
+        @Inject(forwardRef(() => ActiveDirectoryService)) private activeDirectoryService: ActiveDirectoryService,
+        private websocketService: WebsocketService
     ) { }
 
     lowStrikes: strike[] = [strike.LOGIN_EXEEDED, strike.URL, strike.INVALID_INPUT];
@@ -68,18 +70,22 @@ export class StrikeService {
         return (await this.userStrikeModel.findOne({username: username})).isBlocked
     }
 
-    public async strike(username: string, strike: strike) {
+    public async strike(username: string | null, strike: strike) {
         try {
-            await this.userHandle(username);
-            const panelty: number = this.calculatePanelty(strike);
-            const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: strike } }, {new: true});
-            if (user.panelty >= 8) {
-                if (user.panelty >= 14) {
-                    await this.activeDirectoryService.blockUser(username);
-                    await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {isBlocked: true}});
-                    //send to websocket to log out
+            console.log(strike);
+            if (username != null) {
+                await this.userHandle(username);
+                const panelty: number = this.calculatePanelty(strike);
+                const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: strike } }, {new: true});
+                await this.websocketService.userSignout(username);//temp
+                if (user.panelty >= 8) {
+                    if (user.panelty >= 14) {
+                        await this.activeDirectoryService.blockUser(username);
+                        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {isBlocked: true}});
+                        await this.websocketService.userSignout(username);
+                    }
+                    await this.userLimit(username);
                 }
-                await this.userLimit(username);
             }
         }
         catch (err) {
@@ -94,6 +100,7 @@ export class StrikeService {
 
     public async userLimit(username: string): Promise<void> {
         this.activeDirectoryService.limitUser(username);
+        await this.websocketService.userSignout(username);
     }
 
     public calculatePanelty(strike: strike): number {

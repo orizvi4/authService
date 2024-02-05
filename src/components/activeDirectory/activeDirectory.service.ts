@@ -109,7 +109,7 @@ export class ActiveDirectoryService {
                 throw new InternalServerErrorException();
             }
             await this.strikeService.addLoginAttempt(body.username);
-            throw new UnauthorizedException();
+            throw new BadRequestException();
         }
     }
     async getUserGroup(username: string): Promise<group> {
@@ -177,6 +177,33 @@ export class ActiveDirectoryService {
                 operation: 'replace',
                 modification: {
                     userAccountControl: 514,
+                }
+            };
+            await new Promise((resolve, reject) => {
+                this.client.modify(DN, change, (err) => {
+                    if (err) {
+                        return reject(err);
+                    }
+                    resolve('success');
+                });
+            });
+        }
+        catch (err) {
+            console.log(err);
+            LoggerService.logError(err.message, 'ldapjs');
+            throw new BadRequestException();
+        }
+    }
+
+    public async unblockUser(username: string): Promise<void> {
+        const DN = `cn=${username},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`;
+        try {
+            await this.clientBind();
+
+            const change = {
+                operation: 'replace',
+                modification: {
+                    userAccountControl: 544,
                 }
             };
             await new Promise((resolve, reject) => {

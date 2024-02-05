@@ -4,7 +4,7 @@ import { UserDTO } from 'src/components/activeDirectory/models/user.dto';
 import { AuthGuard } from 'src/common/guards/auth.guard';
 import { EditorGuard } from 'src/common/guards/editor.guard';
 import { ManagerGuard } from 'src/common/guards/manager.guard';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ThrottlerExceptionFilter } from 'src/common/filters/throttlerException.filter';
 
 @Controller()
@@ -45,6 +45,7 @@ export class ActiveDirectoryController {
     return (await this.activeDirectoryService.modifyUser(body, clientUsername))
   }
 
+  @SkipThrottle()
   @UseGuards(AuthGuard)
   @Get('/groups/user')
   async getUserGroup(@Query("username") username: string, @Headers("username") clientUsername: string): Promise<string> {

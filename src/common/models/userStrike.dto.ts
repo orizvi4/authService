@@ -1,9 +1,10 @@
-import { strike } from "src/common/enums/strike.enums";
+import { StrikeDTO } from "./strike.dto";
+
 
 export interface UserStrikeDTO {
     username: string;
     panelty: number;
     isBlocked: boolean;
     loginAttempts: number;
-    strikes: strike[];
+    strikes: StrikeDTO[];
 }

@@ -6,6 +6,8 @@ import { UserStrikeDTO } from "src/common/models/userStrike.dto";
 import { ActiveDirectoryService } from "src/components/activeDirectory/activeDirectory.service";
 import { Inject, forwardRef } from "@nestjs/common";
 import { WebsocketService } from "./websocket.service";
+import { Strike } from "../models/strike.model";
+import { StrikeDTO } from "../models/strike.dto";
 
 export class StrikeService {
 
@@ -47,6 +49,18 @@ export class StrikeService {
         await this.userStrikeModel.findOneAndUpdate({ username: oldUsername }, { $set: {username: newUsername}});
     }
 
+    public async getUserStrikes(username: string): Promise<StrikeDTO[]> {
+        return (await this.userStrikeModel.findOne({ username: username })).strikes;
+    }
+
+    public async resetPanelty(username: string): Promise<void> {
+        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {panelty: 0}});
+    }
+
+    public async getUserPanelty(username: string): Promise<number> {
+        return (await this.userStrikeModel.findOne({ username: username })).panelty;
+    }
+
     public async userHandle(username: string) {//checks if user exist and create
         try {
             const user: UserStrikeDTO = await this.userStrikeModel.findOne({ username: username });
@@ -76,15 +90,15 @@ export class StrikeService {
             if (username != null) {
                 await this.userHandle(username);
                 const panelty: number = this.calculatePanelty(strike);
-                const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: strike } }, {new: true});
-                await this.websocketService.userSignout(username);//temp
+                const timeNow: Date = new Date();
+                const tempStrike: StrikeDTO = {strike: strike, time: new Date(timeNow + "Z")}
+                const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: tempStrike } }, {new: true});
                 if (user.panelty >= 8) {
                     if (user.panelty >= 14) {
-                        await this.activeDirectoryService.blockUser(username);
-                        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {isBlocked: true}});
-                        await this.websocketService.userSignout(username);
+                        // this.setUserBlock(username, true)
+                        // await this.websocketService.userSignout(username);
                     }
-                    await this.userLimit(username);
+                    // await this.userLimit(username);
                 }
             }
         }
@@ -94,8 +108,15 @@ export class StrikeService {
 
     }
 
-    public async unblockUser(username: string): Promise<void> {
-        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {isBlocked: false}});
+    public async setUserBlock(username: string, block: boolean): Promise<void> {
+        if (block == true) {
+            await this.activeDirectoryService.blockUser(username);
+            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {isBlocked: true}});
+        }
+        else {
+            await this.activeDirectoryService.unblockUser(username);
+            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {isBlocked: false, panelty: 0}});
+        }
     }
 
     public async userLimit(username: string): Promise<void> {

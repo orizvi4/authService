@@ -8,6 +8,7 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { UserStrike, UserStrikeSchema } from "src/common/models/userStrike.model";
 import { ActiveDirectoryModule } from "src/components/activeDirectory/activeDirectory.module";
 import { WebsocketService } from "./services/websocket.service";
+import { Strike, StrikeSchema } from "./models/strike.model";
 
 @Module({
     imports: [JwtModule, MongooseModule.forFeature([{ name: UserStrike.name, schema: UserStrikeSchema }]), forwardRef(() => ActiveDirectoryModule)],

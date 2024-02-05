@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Document } from "mongoose";
 import { strike } from "src/common/enums/strike.enums";
+import { Strike } from "./strike.model";
 
 @Schema()
 export class UserStrike extends Document {
@@ -17,7 +18,7 @@ export class UserStrike extends Document {
   loginAttempts: number;
 
   @Prop()
-  strikes: strike[];
+  strikes: Strike[];
 }
 
 export const UserStrikeSchema = SchemaFactory.createForClass(UserStrike);

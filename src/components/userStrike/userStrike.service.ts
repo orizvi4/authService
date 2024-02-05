@@ -5,6 +5,7 @@ import { AuthTokenService } from "src/common/services/AuthToken.service";
 import { LoggerService } from "src/common/services/logger.service";
 import { StrikeService } from "src/common/services/strike.service";
 import { strike } from "src/common/enums/strike.enums";
+import { StrikeDTO } from "src/common/models/strike.dto";
 
 @Injectable()
 export class UserStrikeService {
@@ -14,6 +15,26 @@ export class UserStrikeService {
         const decodeToken: CustomJwtPayload = this.authTokenService.decode(token);
         const payload = { username: decodeToken.username, group: decodeToken.group };
         return await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
+    }
+
+    public async isUserBlocked(username: string): Promise<boolean> {
+        return await this.strikeService.isBlocked(username);
+    }
+
+    public async setUserBlock(username: string, block: boolean): Promise<void> {
+        await this.strikeService.setUserBlock(username, block);
+    }
+
+    public async resetPanelty(username: string): Promise<void> {
+        await this.strikeService.resetPanelty(username);
+    }
+
+    public async getUserStrikes(username: string): Promise<StrikeDTO[]> {
+        return await this.strikeService.getUserStrikes(username);
+    }
+
+    public async getUserPanelty(username: string): Promise<number> {
+        return await this.strikeService.getUserPanelty(username);
     }
 
     public async strike(token: string, strike: strike): Promise<void> {

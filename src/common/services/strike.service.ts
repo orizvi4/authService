@@ -22,12 +22,13 @@ export class StrikeService {
     severeStrikes: strike[] = [strike.MANAGER_REQUEST, strike.LOCAL_STORAGE, strike.DOS];
     strikesArrays: strike[][] = [this.lowStrikes, this.highStrikes, this.severeStrikes];
 
-    public async addLoginAttempt(username: string) {
+    public async addLoginAttempt(username: string): Promise<void> {
         try {
-            await this.userHandle(username);
-            const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { loginAttempts: 1 } });
-            if (user.loginAttempts >= 6) {
-                await this.strike(username, strike.LOGIN_EXEEDED);
+            if (await this.userStrikeModel.findOne({ username: username })) {
+                const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { loginAttempts: 1 } });
+                if (user.loginAttempts >= 6) {
+                    await this.strike(username, strike.LOGIN_EXEEDED);
+                }
             }
         }
         catch (err) {
@@ -35,10 +36,11 @@ export class StrikeService {
         }
     }
 
-    public async resetLoginAttempt(username: string) {
+    public async resetLoginAttempt(username: string): Promise<void> {
         try {
-            await this.userHandle(username);
-            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { loginAttempts: 0 } });
+            if (await this.userStrikeModel.findOne({ username: username })) {
+                await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { loginAttempts: 0 } });
+            }
         }
         catch (err) {
             console.log(err);
@@ -46,7 +48,7 @@ export class StrikeService {
     }
 
     public async changeUsername(oldUsername: string, newUsername: string): Promise<void> {
-        await this.userStrikeModel.findOneAndUpdate({ username: oldUsername }, { $set: {username: newUsername}});
+        await this.userStrikeModel.findOneAndUpdate({ username: oldUsername }, { $set: { username: newUsername } });
     }
 
     public async getUserStrikes(username: string): Promise<StrikeDTO[]> {
@@ -54,25 +56,32 @@ export class StrikeService {
     }
 
     public async resetPanelty(username: string): Promise<void> {
-        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {panelty: 0}});
+        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { panelty: 0 } });
     }
 
     public async getUserPanelty(username: string): Promise<number> {
         return (await this.userStrikeModel.findOne({ username: username })).panelty;
     }
 
-    public async userHandle(username: string) {//checks if user exist and create
+    public async deleteUser(username: string): Promise<void> {
         try {
-            const user: UserStrikeDTO = await this.userStrikeModel.findOne({ username: username });
-            if (!user) {
-                await new this.userStrikeModel({
-                    strikes: [],
-                    panelty: 0,
-                    loginAttempts: 0,
-                    username: username,
-                    isBlocked: false
-                }).save();
-            }
+            await this.userStrikeModel.deleteOne({username: username});
+        }
+        catch (err) {
+            console.log();
+        }
+    }
+
+    public async createUser(username: string): Promise<void> {
+        try {
+            const user = new this.userStrikeModel({
+                strikes: [],
+                panelty: 0,
+                loginAttempts: 0,
+                username: username,
+                isBlocked: false
+            });
+            await user.save();
         }
         catch (err) {
             console.log(err);
@@ -80,26 +89,27 @@ export class StrikeService {
     }
 
     public async isBlocked(username: string): Promise<boolean> {
-        await this.userHandle(username);
-        return (await this.userStrikeModel.findOne({username: username})).isBlocked
+        if (await this.userStrikeModel.findOne({ username: username })) {
+            return (await this.userStrikeModel.findOne({ username: username })).isBlocked
+        }
+        return false;
     }
 
     public async strike(username: string | null, strike: strike) {
         try {
             console.log(strike);
             if (username != null) {
-                await this.userHandle(username);
-                const panelty: number = this.calculatePanelty(strike);
-                const timeNow: Date = new Date();
-                const tempStrike: StrikeDTO = {strike: strike, time: new Date(timeNow + "Z")}
-                const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: tempStrike } }, {new: true});
-                if (user.panelty >= 8) {
-                    if (user.panelty >= 14) {
-                        // this.setUserBlock(username, true)
-                        // await this.websocketService.userSignout(username);
-                    }
-                    // await this.userLimit(username);
-                }
+                // const panelty: number = this.calculatePanelty(strike);
+                // const timeNow: Date = new Date();
+                // const tempStrike: StrikeDTO = { strike: strike, time: new Date(timeNow + "Z") }
+                // const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: tempStrike } }, { new: true });
+                // if (user.panelty >= 8) {
+                //     if (user.panelty >= 14) {
+                //         this.setUserBlock(username, true)
+                //         await this.websocketService.userSignout(username);
+                //     }
+                //     await this.userLimit(username);
+                // }
             }
         }
         catch (err) {
@@ -111,11 +121,11 @@ export class StrikeService {
     public async setUserBlock(username: string, block: boolean): Promise<void> {
         if (block == true) {
             await this.activeDirectoryService.blockUser(username);
-            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {isBlocked: true}});
+            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { isBlocked: true } });
         }
         else {
             await this.activeDirectoryService.unblockUser(username);
-            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: {isBlocked: false, panelty: 0}});
+            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { isBlocked: false, panelty: 0 } });
         }
     }
 

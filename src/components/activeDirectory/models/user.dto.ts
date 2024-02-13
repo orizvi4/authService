@@ -5,4 +5,6 @@ export interface UserDTO {
     password: string;
     sn: string;
     group: group;
+    mail: string;
+    telephoneNumber: string;
 }

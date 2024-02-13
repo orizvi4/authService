@@ -5,7 +5,7 @@ import { AuthTokenService } from 'src/common/services/AuthToken.service';
 import { LoggerService } from 'src/common/services/logger.service';
 import { StrikeService } from 'src/common/services/strike.service';
 import { strike } from 'src/common/enums/strike.enums';
-import {group} from 'src/common/enums/group.enums';
+import { group } from 'src/common/enums/group.enums';
 
 const ActiveDirectory = require('activedirectory');
 const ldap = require('ldapjs');
@@ -18,13 +18,12 @@ export class ActiveDirectoryService {
         @Inject(forwardRef(() => StrikeService)) private strikeService: StrikeService) {
         this.createLDAPClient();
     }
-    config = {
+    activeDirectory = new ActiveDirectory({
         url: `ldap://${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
         baseDN: `dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`,
         username: `${Constants.ADMIN_USER}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
-        password: Constants.ADMIN_PASSWORD
-    };
-    activeDirectory = new ActiveDirectory(this.config);
+        password: Constants.ADMIN_PASSWORD,
+    });
     groups: group[] = [group.EDITORS, group.MANAGERS];
     client;
 
@@ -34,36 +33,35 @@ export class ActiveDirectoryService {
         this.authTokenService.addToBlackList(refreshToken);
     }
 
-    async createLDAPClient(reconnect: boolean = false) {
-        if (this.client == undefined) {
-            this.client = await ldap.createClient({
-                url: `ldaps://${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}:636`,
-                tlsOptions: {
-                    rejectUnauthorized: false
-                }
-            });
-        }
+    async createLDAPClient() {
+        this.client = await ldap.createClient({
+            url: `ldap://${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
+            tlsOptions: {
+                rejectUnauthorized: false
+            },
+            reconnect: true,
+            idleTimeout: 3000
+        });
 
-        this.client.on('error', async (err) => {
-            if (!reconnect) {
-                LoggerService.logError(err.message, 'ldapjs');
-            }
-            await new Promise((resolve) => { setTimeout(resolve, 2500) });
-            this.createLDAPClient(true);
+        this.client.on('error', (err) => {
+            console.log(err);
+            LoggerService.logError(err.message, 'ldapjs');
         });
     }
 
     async getUsers(): Promise<string> {
         return await new Promise<string>((resolve, reject) => {
-            this.activeDirectory.findUsers((err, users: Array<any>) => { // try active directory user
+            this.activeDirectory.findUsers({
+                attributes: ['givenName', 'sn', 'mail', 'sAMAccountName', 'telephoneNumber']
+            }, (err, users: Array<any>) => { // try active directory user
                 if (err) {
                     LoggerService.logError(err.message, 'active directory');
                     reject(new InternalServerErrorException());
                 }
                 else {
-                    users = users.filter(user => user.sAMAccountName !== 'admin');
+                    users = users.filter(user => user.sAMAccountName !== 'krbtgt' && user.sAMAccountName !== 'Administrator' && user.sAMAccountName !== 'Guest');
 
-                    resolve(JSON.stringify(users.slice(3)));
+                    resolve(JSON.stringify(users));
                 }
             });
         });
@@ -74,9 +72,6 @@ export class ActiveDirectoryService {
         const password: string = body.password;
 
         try {
-            if (await this.strikeService.isBlocked(body.username)) {
-                throw new UnauthorizedException();
-            }
             await new Promise((resolve, reject) => {
                 this.activeDirectory.authenticate(username, password, (err, auth) => {
                     if (err) {
@@ -85,7 +80,10 @@ export class ActiveDirectoryService {
                     resolve(auth);
                 });
             });
-
+            if (await this.strikeService.isBlocked(body.username)) {
+                throw new UnauthorizedException();
+            }
+            
             LoggerService.logInfo('user: ' + username + ' authanticated successfully');
             await this.strikeService.resetLoginAttempt(body.username);
 
@@ -105,8 +103,12 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             LoggerService.logError(err.message, 'active directory');
+            console.log(err);
             if (err.errno == -3008) {
                 throw new InternalServerErrorException();
+            }
+            if (err.response != null && err.response.statusCode == 401) {
+                throw new UnauthorizedException();
             }
             await this.strikeService.addLoginAttempt(body.username);
             throw new BadRequestException();
@@ -242,6 +244,8 @@ export class ActiveDirectoryService {
                     givenName: newUser.username,
                     sn: newUser.sn,
                     displayName: `${newUser.username} ${newUser.sn}`,
+                    mail: newUser.mail,
+                    telephoneNumber: newUser.telephoneNumber
                 }
             };
             if (newUser.username != oldUser.username) {
@@ -270,6 +274,8 @@ export class ActiveDirectoryService {
                 sn: newUser.sn,
                 isEdit: false,
                 group: newUser.group,
+                mail: newUser.mail,
+                telephoneNumber: newUser.telephoneNumber
             });
         }
         catch (err) {
@@ -321,6 +327,8 @@ export class ActiveDirectoryService {
                     givenName: body.username,
                     sn: body.sn,
                     displayName: `${body.username} ${body.sn}`,
+                    mail: body.mail,
+                    telephoneNumber: body.telephoneNumber,
                     objectClass: 'user',
                     userAccountControl: 544,
                     // unicodePwd: utf16Buffer
@@ -334,21 +342,23 @@ export class ActiveDirectoryService {
                     LoggerService.logInfo('user: ' + body.username + ' has been created');
                     resolve("success");
                 });
+
                 if (res == "success") {
                     if (body.group != group.USERS) {
                         await this.addToGroup(body.username, body.group);
                     }
                     const now: string[] = ((new Date()).toLocaleDateString()).split('/');
+                    await this.strikeService.createUser(body.username);
                     return JSON.stringify({
                         userPrincipalName: `${body.username}@${Constants.DOMAIN_NAME}.${Constants.DOMAIN_END}`,
                         givenName: body.username,
                         sn: body.sn,
                         isEdit: false,
-                        whenCreated: `${now[2]}${now[1]}${now[0]}`,
-                        group: body.group
+                        group: body.group,
+                        mail: body.mail,
+                        telephoneNumber: body.telephoneNumber,
                     });
                 }
-                await this.strikeService.userHandle(body.username);
             }
             else {
                 throw new BadRequestException();
@@ -356,6 +366,7 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             LoggerService.logError(err.message, 'ldapjs');
+            console.log(err);
             if (err.status == 400) {
                 throw new BadRequestException();
             }
@@ -366,7 +377,7 @@ export class ActiveDirectoryService {
     async deleteUser(name: string): Promise<string> {
         try {
             await this.clientBind();
-            return await new Promise(async (resolve, reject) => {
+            const res: string = await new Promise(async (resolve, reject) => {
                 await this.client.del(`cn=${name},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END}`, (err) => {
                     if (err) {
                         return reject(err);
@@ -375,6 +386,10 @@ export class ActiveDirectoryService {
                     resolve("success");
                 });
             });
+            if (res == "success") {
+                this.strikeService.deleteUser(name);
+            }
+            return "fail";
         }
         catch (err) {
             LoggerService.logError(err.message, 'ldapjs');

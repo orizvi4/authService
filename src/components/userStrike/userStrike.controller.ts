@@ -27,9 +27,16 @@ export class UserStrikeController {
 
   @SkipThrottle()
   @UseGuards(AuthGuard)
-  @Post('/tokens/refresh')
-  public async refreshToken(@Body() body): Promise<string> {
-    return await this.userStrikeService.refreshToken(body.token);
+  @Post("/tokens/refresh/get")
+  public async getRefreshToken(@Body('token') token: string): Promise<string> {
+    return await this.userStrikeService.getRefreshToken(token);
+  }
+
+  @SkipThrottle()
+  @UseGuards(AuthGuard)
+  @Post('/tokens/refresh/access')
+  public async refreshToken(@Body('token') token: string): Promise<string> {
+    return await this.userStrikeService.refreshToken(token);
   }
 
   @SkipThrottle()

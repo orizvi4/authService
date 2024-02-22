@@ -37,6 +37,10 @@ export class UserStrikeService {
         return await this.strikeService.getUserPanelty(username);
     }
 
+    public async getRefreshToken(token: string): Promise<string> {
+        return await this.authTokenService.getRefreshToken(token);
+    }
+
     public async strike(token: string, strike: strike): Promise<void> {
         try {
             const username: string | null = this.authTokenService.decode(token).username;

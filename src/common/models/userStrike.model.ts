@@ -19,6 +19,9 @@ export class UserStrike extends Document {
 
   @Prop()
   strikes: Strike[];
+
+  @Prop()
+  refreshToken: string;
 }
 
 export const UserStrikeSchema = SchemaFactory.createForClass(UserStrike);

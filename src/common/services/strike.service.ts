@@ -79,7 +79,8 @@ export class StrikeService {
                 panelty: 0,
                 loginAttempts: 0,
                 username: username,
-                isBlocked: false
+                isBlocked: false,
+                refreshToken: '',
             });
             await user.save();
         }

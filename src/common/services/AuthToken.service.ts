@@ -1,16 +1,20 @@
 import { JwtService } from "@nestjs/jwt";
 import { Constants } from "../constants.class";
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, UnauthorizedException } from "@nestjs/common";
 import { JwtPayload, jwtDecode } from "jwt-decode";
 import { CustomJwtPayload } from "../models/customJwtPayload.class";
 import { StrikeService } from "./strike.service";
 import { strike } from "../enums/strike.enums";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import { UserStrike } from "../models/userStrike.model";
 
 @Injectable()
 export class AuthTokenService {
     constructor(
         private jwtService: JwtService,
-        private strikeService: StrikeService
+        private strikeService: StrikeService,
+        @InjectModel(UserStrike.name) private readonly userStrikeModel: Model<UserStrike>
     ) { }
 
     private blackList: Set<string> = new Set();
@@ -26,6 +30,26 @@ export class AuthTokenService {
         catch (err) {
             console.log(err.message);
             return { username: null };
+        }
+    }
+
+    public async setUserRefreshToken(username: string, refreshToken: string = ''): Promise<void> {
+        try {
+            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { refreshToken: refreshToken } });
+        }
+        catch (err) {
+            console.log(err);
+            throw new InternalServerErrorException();
+        }
+    }
+
+    public async getRefreshToken(token: string): Promise<string> {
+        try {
+            return (await this.userStrikeModel.findOne({ username: this.decode(token).username })).refreshToken;
+        }
+        catch (err) {
+            console.log(err);
+            throw new InternalServerErrorException();
         }
     }
 
@@ -51,7 +75,8 @@ export class AuthTokenService {
         }
     }
 
-    addToBlackList(token: string): void {
+    public async addToBlackList(token: string): Promise<void> {
+        await this.setUserRefreshToken(this.decode(token).username);
         this.blackList.add(token);
     }
 }

@@ -44,12 +44,12 @@ export class ActiveDirectoryService {
         });
 
         this.client.on('error', (err) => {
-            console.log(err);
+            console.log(err.message);
             LoggerService.logError(err.message, 'ldapjs');
         });
     }
 
-    public async getTokenUser(token: string): Promise<string> {
+    public async getTokenUser(token: string): Promise<string> {//get the user by the token
         const username: string = this.authTokenService.decode(token).username;
         return await new Promise<string>((resolve, reject) => {
             this.activeDirectory.findUser({
@@ -116,7 +116,8 @@ export class ActiveDirectoryService {
             const payload = { username: body.username, group: tempGroup };
             const accessToken = await this.authTokenService.sign(payload, Constants.ACCESS_TOKEN_EXPIRE);
             const refreshToken = await this.authTokenService.sign(payload, Constants.REFRESH_TOKEN_EXPIRE);
-            return { ...user, group: tempGroup, accessToken: accessToken, refreshToken: refreshToken }
+            await this.authTokenService.setUserRefreshToken(body.username, refreshToken);
+            return { ...user, group: tempGroup, accessToken: accessToken }
         }
         catch (err) {
             LoggerService.logError(err.message, 'active directory');

@@ -7,4 +7,5 @@ export interface UserStrikeDTO {
     isBlocked: boolean;
     loginAttempts: number;
     strikes: StrikeDTO[];
+    refreshToken: string;
 }

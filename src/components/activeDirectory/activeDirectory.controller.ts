@@ -23,8 +23,15 @@ export class ActiveDirectoryController {
 
   @UseGuards(ManagerGuard)
   @Get("/users")
-  async getUsers() {
-    return await this.activeDirectoryService.getUsers();
+  async getUsers(@Query('username') username: string): Promise<string> {
+    return await this.activeDirectoryService.getUsers(username);
+  }
+
+  @SkipThrottle()
+  @UseGuards(AuthGuard)
+  @Post('/users/user')
+  public async tokenUser(@Body('token') token: string): Promise<string> {
+    return await this.activeDirectoryService.getTokenUser(token);
   }
 
   @UseGuards(ManagerGuard)

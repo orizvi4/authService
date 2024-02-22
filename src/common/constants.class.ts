@@ -1,5 +1,5 @@
 export class Constants {
-    public static readonly LOGGER_SERVICE: string = 'http://localhost:3005';
+    public static readonly LOGGER_SERVICE: string = 'http://192.168.1.6:3005';
     public static readonly ELASTIC_INDEX: string = 'auth-service';
     public static readonly ADMIN_USER: string = "Administrator";
     public static readonly ADMIN_PASSWORD: string = "Cobra123";

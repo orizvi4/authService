@@ -49,7 +49,24 @@ export class ActiveDirectoryService {
         });
     }
 
-    async getUsers(): Promise<string> {
+    public async getTokenUser(token: string): Promise<string> {
+        const username: string = this.authTokenService.decode(token).username;
+        return await new Promise<string>((resolve, reject) => {
+            this.activeDirectory.findUser({
+                attributes: ['givenName', 'sn', 'mail', 'sAMAccountName', 'telephoneNumber']
+            }, username, (err, user) => {
+                if (err) {
+                    LoggerService.logError(err.message, 'active directory');
+                    reject(new InternalServerErrorException());
+                }
+                else {
+                    resolve(JSON.stringify(user));
+                }
+            });
+        });
+    }
+
+    async getUsers(username: string): Promise<string> {
         return await new Promise<string>((resolve, reject) => {
             this.activeDirectory.findUsers({
                 attributes: ['givenName', 'sn', 'mail', 'sAMAccountName', 'telephoneNumber']
@@ -59,7 +76,7 @@ export class ActiveDirectoryService {
                     reject(new InternalServerErrorException());
                 }
                 else {
-                    users = users.filter(user => user.sAMAccountName !== 'krbtgt' && user.sAMAccountName !== 'Administrator' && user.sAMAccountName !== 'Guest');
+                    users = users.filter(user => user.sAMAccountName !== 'krbtgt' && user.sAMAccountName !== 'Administrator' && user.sAMAccountName !== 'Guest' && user.sAMAccountName !== username);
 
                     resolve(JSON.stringify(users));
                 }
@@ -83,7 +100,7 @@ export class ActiveDirectoryService {
             if (await this.strikeService.isBlocked(body.username)) {
                 throw new UnauthorizedException();
             }
-            
+
             LoggerService.logInfo('user: ' + username + ' authanticated successfully');
             await this.strikeService.resetLoginAttempt(body.username);
 

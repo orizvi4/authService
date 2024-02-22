@@ -99,9 +99,9 @@ export class StrikeService {
         try {
             console.log(strike);
             if (username != null) {
-                // const panelty: number = this.calculatePanelty(strike);
-                // const timeNow: Date = new Date();
-                // const tempStrike: StrikeDTO = { strike: strike, time: new Date(timeNow + "Z") }
+                const panelty: number = this.calculatePanelty(strike);
+                const timeNow: Date = new Date();
+                const tempStrike: StrikeDTO = { strike: strike, time: new Date(timeNow + "Z") }
                 // const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: tempStrike } }, { new: true });
                 // if (user.panelty >= 8) {
                 //     if (user.panelty >= 14) {

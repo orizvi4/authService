@@ -8,22 +8,47 @@ import { strike } from "../enums/strike.enums";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { UserStrike } from "../models/userStrike.model";
+import { Blacklist } from "../models/blacklist.model";
+import { BlacklistDTO } from "../models/blacklist.dto";
 
 @Injectable()
 export class AuthTokenService {
     constructor(
         private jwtService: JwtService,
         private strikeService: StrikeService,
-        @InjectModel(UserStrike.name) private readonly userStrikeModel: Model<UserStrike>
-    ) { }
+        @InjectModel(UserStrike.name) private readonly userStrikeModel: Model<UserStrike>,
+        @InjectModel(Blacklist.name) private readonly blacklistModel: Model<Blacklist>
+    ) {
+        this.cleanBlacklist();
+    }
 
-    private blackList: Set<string> = new Set();
+    public async cleanBlacklist(): Promise<void> {
+        setInterval(async () => {
+            const now: Date = new Date(new Date() + "z");
+            for (const token of await this.blacklistModel.find({ type: "accessToken" }).sort({ addedTime: 1 })) {
+                if (now.getTime() - token.addedTime.getTime() > 300000) {
+                    await this.blacklistModel.findOneAndDelete({ token: token.token });
+                }
+                else {
+                    break;
+                }
+            }
+            for (const token of await this.blacklistModel.find({ type: "refreshToken" }).sort({ addedTime: 1 })) {
+                if (now.getTime() - token.addedTime.getTime() > 172800000) {
+                    await this.blacklistModel.findOneAndDelete({ token: token.token });
+                }
+                else {
+                    break;
+                }
+            }
+        }, 305000)
+    }
 
-    async sign(payload, expire: string) {
+    public async sign(payload, expire: string) {
         return await this.jwtService.signAsync(payload, { secret: Constants.JWT_SECRET, expiresIn: expire })
     }
 
-    decode(token: string): CustomJwtPayload {
+    public decode(token: string): CustomJwtPayload {
         try {
             return jwtDecode(token);
         }
@@ -53,8 +78,8 @@ export class AuthTokenService {
         }
     }
 
-    async verify(token: string, strikeRequest: strike) {
-        if (this.blackList.has(token)) {
+    public async verify(token: string, strikeRequest: strike) {
+        if (await this.blacklistModel.findOne({ token: token })) {
             const decodedToken: CustomJwtPayload = this.decode(token);
             await this.strikeService.strike(decodedToken.username, strikeRequest);
             throw new UnauthorizedException();
@@ -75,8 +100,13 @@ export class AuthTokenService {
         }
     }
 
-    public async addToBlackList(token: string): Promise<void> {
+    public async addToBlackList(token: string, type: string): Promise<void> {
         await this.setUserRefreshToken(this.decode(token).username);
-        this.blackList.add(token);
+        const doc = new this.blacklistModel({
+            token: token,
+            type: type,
+            addedTime: new Date() + "z"
+        });
+        await doc.save();
     }
 }

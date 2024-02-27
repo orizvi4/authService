@@ -9,9 +9,10 @@ import { UserStrike, UserStrikeSchema } from "src/common/models/userStrike.model
 import { ActiveDirectoryModule } from "src/components/activeDirectory/activeDirectory.module";
 import { WebsocketService } from "./services/websocket.service";
 import { Strike, StrikeSchema } from "./models/strike.model";
+import { Blacklist, BlacklistSchema } from "./models/blacklist.model";
 
 @Module({
-    imports: [JwtModule, MongooseModule.forFeature([{ name: UserStrike.name, schema: UserStrikeSchema }]), forwardRef(() => ActiveDirectoryModule)],
+    imports: [JwtModule, MongooseModule.forFeature([{ name: UserStrike.name, schema: UserStrikeSchema }, {name: Blacklist.name, schema: BlacklistSchema}]), forwardRef(() => ActiveDirectoryModule)],
     providers: [StrikeService, LoggerService, AuthTokenService, WebsocketService],
     exports: [StrikeService, LoggerService, AuthTokenService, WebsocketService]
   })

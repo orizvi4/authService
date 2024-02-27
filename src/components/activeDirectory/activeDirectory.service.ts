@@ -29,8 +29,8 @@ export class ActiveDirectoryService {
 
 
     async addToBlackList(accessToken: string, refreshToken: string) {
-        this.authTokenService.addToBlackList(accessToken);
-        this.authTokenService.addToBlackList(refreshToken);
+        this.authTokenService.addToBlackList(accessToken, "accessToken");
+        this.authTokenService.addToBlackList(refreshToken, "refreshToken");
     }
 
     async createLDAPClient() {

@@ -56,7 +56,7 @@ export class StrikeService {
     }
 
     public async resetPanelty(username: string): Promise<void> {
-        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { panelty: 0 } });
+        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { panelty: 0, strikes: [] } });
     }
 
     public async getUserPanelty(username: string): Promise<number> {

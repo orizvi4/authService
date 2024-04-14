@@ -6,7 +6,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { UserStrikeModule } from './components/userStrike/userStrike.module';
 
 @Module({
-  imports: [ActiveDirectoryModule, UserStrikeModule, MongooseModule.forRoot('mongodb://127.0.0.1:27017/database')],
+  imports: [ActiveDirectoryModule, UserStrikeModule, MongooseModule.forRoot('mongodb://192.168.1.5:27017/database')],
   controllers: [AppController],
   providers: [AppService],
 })

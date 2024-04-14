@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Document } from "mongoose";
-import { strike } from "src/common/enums/strike.enums";
 import { Strike } from "./strike.model";
 
 @Schema()

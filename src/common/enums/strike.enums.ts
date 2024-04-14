@@ -1,11 +1,11 @@
 export enum strike {
-    MANAGER_URL = "manager url",//done
-    URL = "url",//done
-    MANAGER_REQUEST = "manager request",//done
-    EDITOR_REQUEST = "editor request",//done
-    REQUEST = "request",//done
-    DOS = "dos",//done
-    LOGIN_EXEEDED = "login exeeded",//done
-    LOCAL_STORAGE = "local storage",//done
-    INVALID_INPUT = "invalid input"//done except mail and phone (remove @ and . as unauthorized somethime)
+    MANAGER_URL = "manager url",
+    URL = "url",
+    MANAGER_REQUEST = "manager request",
+    EDITOR_REQUEST = "editor request",
+    REQUEST = "request",
+    DOS = "dos",
+    LOGIN_EXEEDED = "login exeeded",
+    LOCAL_STORAGE = "local storage",
+    INVALID_INPUT = "invalid input"
 }

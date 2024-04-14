@@ -45,7 +45,6 @@ export class ActiveDirectoryService {
 
         this.client.on('error', (err) => {
             console.log(err.message);
-            LoggerService.logError(err.message, 'ldapjs');
         });
     }
 
@@ -101,7 +100,7 @@ export class ActiveDirectoryService {
                 throw new UnauthorizedException();
             }
 
-            LoggerService.logInfo('user: ' + username + ' authanticated successfully');
+            LoggerService.logInfo('user: ' + body.username + ' authanticated successfully');
             await this.strikeService.resetLoginAttempt(body.username);
 
             let user: UserDTO = await new Promise((resolve, reject) => {
@@ -120,15 +119,15 @@ export class ActiveDirectoryService {
             return { ...user, group: tempGroup, accessToken: accessToken }
         }
         catch (err) {
-            LoggerService.logError(err.message, 'active directory');
             console.log(err);
-            if (err.errno == -3008) {
+            if (err.errno == -3008 || err.errno == -4039) {
                 throw new InternalServerErrorException();
             }
             if (err.response != null && err.response.statusCode == 401) {
                 throw new UnauthorizedException();
             }
             await this.strikeService.addLoginAttempt(body.username);
+            LoggerService.logError("user: " + body.username + " failed attempt to log in", 'active directory');
             throw new BadRequestException();
         }
     }
@@ -177,7 +176,6 @@ export class ActiveDirectoryService {
                     reject("error");
                 }
                 else {
-                    LoggerService.logInfo(`client: cn=${Constants.ADMIN_USER},cn=Users,dc=${Constants.DOMAIN_NAME},dc=${Constants.DOMAIN_END} binded`);
                     resolve("binded");
                 }
             });

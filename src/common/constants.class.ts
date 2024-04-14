@@ -6,8 +6,8 @@ export class Constants {
     public static readonly DOMAIN_NAME: string = "cobra";
     public static readonly DOMAIN_END: string = "test";
     public static readonly JWT_SECRET: string = "orizvitheking";
-    public static readonly ACCESS_TOKEN_EXPIRE: string = '5m';//1m
+    public static readonly ACCESS_TOKEN_EXPIRE: string = '5m';
     public static readonly REFRESH_TOKEN_EXPIRE: string = '2d';
-    public static readonly INVALID_TEXT: RegExp = /[!@#$%^&*()_+{}\[\]:;<>,.?~\\/-]/;
+    public static readonly INVALID_TEXT: RegExp = /[!#$%^&*()+{}\[\]:;<>,?~\\]/;
     public static readonly WEBSOCKET_PATH: string = 'http://192.168.1.5:3006';
 }

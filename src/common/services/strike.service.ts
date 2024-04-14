@@ -8,6 +8,7 @@ import { Inject, forwardRef } from "@nestjs/common";
 import { WebsocketService } from "./websocket.service";
 import { Strike } from "../models/strike.model";
 import { StrikeDTO } from "../models/strike.dto";
+import { LoggerService } from "./logger.service";
 
 export class StrikeService {
 
@@ -98,12 +99,12 @@ export class StrikeService {
 
     public async strike(username: string | null, strike: strike) {
         try {
-            console.log(strike);
             if (username != null) {
                 const panelty: number = this.calculatePanelty(strike);
                 const timeNow: Date = new Date();
                 const tempStrike: StrikeDTO = { strike: strike, time: new Date(timeNow + "Z") }
                 // const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: tempStrike } }, { new: true });
+                // LoggerService.logInfo("user: " + username + ", strike: " + strike);
                 // if (user.panelty >= 8) {
                 //     if (user.panelty >= 14) {
                 //         this.setUserBlock(username, true)

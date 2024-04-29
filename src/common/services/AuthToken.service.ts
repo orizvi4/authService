@@ -78,7 +78,7 @@ export class AuthTokenService {
         }
     }
 
-    public async verify(token: string, strikeRequest: strike) {
+    public async verify(token: string, strikeRequest: strike): Promise<boolean> {
         if (await this.blacklistModel.findOne({ token: token })) {
             const decodedToken: CustomJwtPayload = this.decode(token);
             await this.strikeService.strike(decodedToken.username, strikeRequest);
@@ -93,7 +93,7 @@ export class AuthTokenService {
                 }
             );
             return true;
-        } catch {
+        } catch (err) {
             const decodedToken: CustomJwtPayload = this.decode(token);
             await this.strikeService.strike(decodedToken.username, strikeRequest);
             throw new UnauthorizedException();

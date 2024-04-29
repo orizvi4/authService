@@ -9,6 +9,9 @@ export class Strike extends Document {
 
   @Prop()
   time: Date;
+
+  @Prop()
+  relevant: boolean;
 }
 
 export const StrikeSchema = SchemaFactory.createForClass(Strike);

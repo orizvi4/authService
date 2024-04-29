@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { Constants } from "src/common/constants.class";
 import { CustomJwtPayload } from "src/common/models/customJwtPayload.class";
 import { AuthTokenService } from "src/common/services/AuthToken.service";
@@ -39,6 +39,15 @@ export class UserStrikeService {
 
     public async getRefreshToken(token: string): Promise<string> {
         return await this.authTokenService.getRefreshToken(token);
+    }
+
+    public async verifyManagerUrl(token: string) {
+        if (await this.authTokenService.verify(token, strike.MANAGER_URL) &&
+            this.authTokenService.decode(token).group == "managers") {
+            return true;
+        }
+        await this.strike(token, strike.MANAGER_URL);
+        throw new UnauthorizedException();
     }
 
     public async strike(token: string, strike: strike): Promise<void> {

@@ -4,10 +4,11 @@ import { Constants } from "../constants.class";
 import { Request } from 'express';
 import { AuthTokenService } from "../services/AuthToken.service";
 import { strike } from "../enums/strike.enums";
+import { StrikeService } from "../services/strike.service";
 
 @Injectable()
 export class EditorGuard implements CanActivate {
-    constructor(private authTokenService: AuthTokenService) { }
+    constructor(private authTokenService: AuthTokenService, private strikeService: StrikeService) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest();
@@ -18,6 +19,7 @@ export class EditorGuard implements CanActivate {
                 (JSON.parse(this.decode(token)).group == "editors" || JSON.parse(this.decode(token)).group == "managers")) {
                 return true;
             }
+            this.strikeService.strike(token, strike.EDITOR_REQUEST);
         }
         throw new UnauthorizedException();
     }

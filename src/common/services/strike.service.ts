@@ -57,7 +57,7 @@ export class StrikeService {
     }
 
     public async resetPanelty(username: string): Promise<void> {
-        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { panelty: 0, strikes: [] } });
+        await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { panelty: 0, 'strikes.$[].relevant': false } }, {multi: true});
     }
 
     public async getUserPanelty(username: string): Promise<number> {
@@ -102,16 +102,16 @@ export class StrikeService {
             if (username != null) {
                 const panelty: number = this.calculatePanelty(strike);
                 const timeNow: Date = new Date();
-                const tempStrike: StrikeDTO = { strike: strike, time: new Date(timeNow + "Z") }
-                // const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: tempStrike } }, { new: true });
-                // LoggerService.logInfo("user: " + username + ", strike: " + strike);
-                // if (user.panelty >= 8) {
-                //     if (user.panelty >= 14) {
-                //         this.setUserBlock(username, true)
-                //         await this.websocketService.userSignout(username);
-                //     }
-                //     await this.userLimit(username);
-                // }
+                const tempStrike: StrikeDTO = { strike: strike, time: new Date(timeNow + "Z"), relevant: true }
+                const user: UserStrikeDTO = await this.userStrikeModel.findOneAndUpdate({ username: username }, { $inc: { panelty: panelty }, $push: { strikes: tempStrike } }, { new: true });
+                LoggerService.logInfo("user: " + username + ", strike: " + strike);
+                if (user.panelty >= 8) {
+                    if (user.panelty >= 14) {
+                        this.setUserBlock(username, true)
+                        await this.websocketService.userSignout(username);
+                    }
+                    await this.userLimit(username);
+                }
             }
         }
         catch (err) {
@@ -127,7 +127,8 @@ export class StrikeService {
         }
         else {
             await this.activeDirectoryService.unblockUser(username);
-            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { isBlocked: false, panelty: 0 } });
+            await this.userStrikeModel.findOneAndUpdate({ username: username }, { $set: { isBlocked: false } });
+            await this.resetPanelty(username);
         }
     }
 

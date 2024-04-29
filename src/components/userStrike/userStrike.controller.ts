@@ -8,10 +8,11 @@ import { strike } from "src/common/enums/strike.enums";
 import { UserStrikeDTO } from "../../common/models/userStrike.dto";
 import { SkipThrottle } from "@nestjs/throttler";
 import { StrikeDTO } from "src/common/models/strike.dto";
+import { AuthTokenService } from "src/common/services/AuthToken.service";
 
 @Controller()
 export class UserStrikeController {
-  constructor(private readonly userStrikeService: UserStrikeService) { }
+  constructor(private readonly userStrikeService: UserStrikeService, private authTokenService: AuthTokenService) { }
 
   @SkipThrottle()
   @Post("/strike/localStorage")
@@ -69,6 +70,18 @@ export class UserStrikeController {
   @Put('/users/resetPanelty')
   public async resetPanelty(@Body('username') username: string): Promise<void> {
     return await this.userStrikeService.resetPanelty(username);
+  }
+
+  @SkipThrottle()
+  @Post('/tokens/verify/url')
+  public async tokenVerifyUrl(@Body("token") token: string): Promise<boolean> {
+    return await this.authTokenService.verify(token, strike.URL);
+  }
+
+  @SkipThrottle()
+  @Post('/tokens/verify/manager/url')
+  public async managerVerifyUrl(@Body("token") token: string): Promise<boolean> {
+    return await this.userStrikeService.verifyManagerUrl(token);
   }
 
   @SkipThrottle()

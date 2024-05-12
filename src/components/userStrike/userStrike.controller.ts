@@ -99,6 +99,13 @@ export class UserStrikeController {
   }
 
   @SkipThrottle()
+  @UseGuards(ManagerGuard)
+  @Post('/users/kick')
+  public async kickUser(@Body('username') username: string): Promise<void> {
+    await this.userStrikeService.kickUser(username);
+  }
+
+  @SkipThrottle()
   @UseGuards(EditorGuard)
   @Get('/tokens/verify/editor')
   public editorVerify(): boolean {

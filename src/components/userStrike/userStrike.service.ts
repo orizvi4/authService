@@ -6,10 +6,13 @@ import { LoggerService } from "src/common/services/logger.service";
 import { StrikeService } from "src/common/services/strike.service";
 import { strike } from "src/common/enums/strike.enums";
 import { StrikeDTO } from "src/common/models/strike.dto";
+import { WebsocketService } from "src/common/services/websocket.service";
 
 @Injectable()
 export class UserStrikeService {
-    constructor(private authTokenService: AuthTokenService, private strikeService: StrikeService) { }
+    constructor(private authTokenService: AuthTokenService,
+        private strikeService: StrikeService,
+        private websocketService: WebsocketService) { }
 
     public async refreshToken(token: string) {
         const decodeToken: CustomJwtPayload = this.authTokenService.decode(token);
@@ -27,6 +30,10 @@ export class UserStrikeService {
 
     public async resetPanelty(username: string): Promise<void> {
         await this.strikeService.resetPanelty(username);
+    }
+
+    public async kickUser(username: string): Promise<void> {
+        await this.websocketService.userSignout(username);
     }
 
     public async getUserStrikes(username: string): Promise<StrikeDTO[]> {

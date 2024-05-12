@@ -8,7 +8,7 @@ import { LoggerService } from "./logger.service";
 export class WebsocketService {
     public async userSignout(username: string) {
         try {
-            await axios.post<void>(`${Constants.WEBSOCKET_PATH}/user/signout`, username);
+            await axios.post<void>(`${Constants.WEBSOCKET_PATH}/user/signout`, {username: username});
         }
         catch (err) {
             console.log(err);

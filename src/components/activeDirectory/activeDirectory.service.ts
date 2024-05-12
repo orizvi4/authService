@@ -504,7 +504,6 @@ export class ActiveDirectoryService {
         }
         catch (err) {
             LoggerService.logError(err.message, 'ldapjs');
-            throw new InternalServerErrorException();
         }
     }
 }

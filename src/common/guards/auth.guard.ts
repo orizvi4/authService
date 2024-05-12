@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
+import { CanActivate, ExecutionContext, Injectable, InternalServerErrorException, UnauthorizedException } from "@nestjs/common";
 import { Request } from 'express';
 import { AuthTokenService } from "../services/AuthToken.service";
 import { StrikeService } from "../services/strike.service";
@@ -9,13 +9,19 @@ export class AuthGuard implements CanActivate {
     constructor(private authTokenService: AuthTokenService, private strikeService: StrikeService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const token: string = this.extractTokenFromHeader(request);
-    if (!token) {
-      throw new UnauthorizedException();
+    try {
+      const request = context.switchToHttp().getRequest();
+      const token: string = this.extractTokenFromHeader(request);
+      if (!token) {
+        throw new UnauthorizedException();
+      }
+      request.headers["username"] = this.authTokenService.decode(token).username;
+      return await this.authTokenService.verify(token, strike.REQUEST);
     }
-    request.headers["username"] = this.authTokenService.decode(token).username;
-    return await this.authTokenService.verify(token, strike.REQUEST);
+    catch (err) {
+      console.log(err);
+      throw new InternalServerErrorException();
+    }
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
